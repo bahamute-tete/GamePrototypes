@@ -1,4 +1,4 @@
-using System.Collections;
+    using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,10 +18,10 @@ public class Ball : MonoBehaviour
 
 
     [SerializeField]
-    ParticleSystem bounceParticleSystem,trailParticleSystem;
+    ParticleSystem bounceParticleSystem,trailParticleSystem,startParticleSystem;
 
     [SerializeField]
-    int bounceParticleEmission = 20;
+    int bounceParticleEmission = 20, startParticleEmission = 100;
 
     void EmitBounceParticles(float x, float z, float rotation)
     {
@@ -50,6 +50,7 @@ public class Ball : MonoBehaviour
 
     public void StartNewGame()
     {
+        startParticleSystem.Emit(startParticleEmission);
         SetTrailEmission(true);
         trailParticleSystem.Play();
         position = Vector2.zero;
@@ -91,8 +92,8 @@ public class Ball : MonoBehaviour
         position.y = 2f * boundary - position.y;
         velocity.y = -velocity.y;
 
-        EmitBounceParticles(boundary,
-                            position.x - velocity.x * durationAfterBounce,
+        EmitBounceParticles(position.x - velocity.x * durationAfterBounce,
+                            boundary,
                             boundary < 0f ? 0f : 180f);
     }
 
