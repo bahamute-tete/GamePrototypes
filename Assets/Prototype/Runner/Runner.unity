@@ -5514,6 +5514,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   extents: 0.5
+  spinDuration: 0.75
 --- !u!1001 &1073864667
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5670,7 +5671,7 @@ GameObject:
   - component: {fileID: 1604507609}
   - component: {fileID: 1604507608}
   m_Layer: 0
-  m_Name: Obstacle
+  m_Name: ObstacleGenerator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5691,6 +5692,7 @@ MonoBehaviour:
   prefabs:
   - {fileID: 396618814633464378, guid: 534d2474ff8d59740ab4cee2a7e9e12c, type: 3}
   - {fileID: 5670782815160493761, guid: 44e59a60788f90b4eb44b7d5b5c07c4a, type: 3}
+  - {fileID: 9065635892961640132, guid: c18e166d990daf84887fed6ba0c05ba4, type: 3}
   distance: 0
   altitude:
     min: -4

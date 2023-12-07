@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-284387017486250060
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 5
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Shader Graphs_Ocean
+  m_Shader: {fileID: -6465566751694194690, guid: 53263ff17e7da4246bf9e46e9850a283,
+    type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 2
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _NormalTex:
+        m_Texture: {fileID: 2800000, guid: e6f658c397f362f48bbd211dc821f130, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 0.9
+    - _Depth: 3.01
+    - _FormStrenth: 0.3
+    - _NormalSpeed: 0.6
+    - _NormalStrenth: 0.12
+    - _NormalTile: 0.05
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _Smoothness: 0.85
+    - _WaveScale: 1
+    - _WaveSpee: 1
+    - _WaveSpeed: 3
+    - _WaveStrenth: 0.001
+    - _formDistance: -2.55
+    - _offset: 1.84
+    m_Colors:
+    - _DepthColor: {r: 0.07845318, g: 0.27822188, b: 0.4056604, a: 1}
+    - _FormColor: {r: 0.37597898, g: 0.56047845, b: 0.6698113, a: 1}
+    - _WaterColor1: {r: 0.503827, g: 0.7864253, b: 0.9622642, a: 0}
+    - _WaterColor2: {r: 0.13082945, g: 0.40334308, b: 0.5660378, a: 1}
+    - _WaveTile: {r: 41.65, g: 41.73, b: 0, a: 0}
+  m_BuildTextureStacks: []

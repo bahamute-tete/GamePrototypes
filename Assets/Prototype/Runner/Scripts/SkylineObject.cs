@@ -9,19 +9,21 @@ public class SkylineObject : MonoBehaviour
 
     public float MaxX => transform.localPosition.x + extents;
 
+    //è¿æ¥åœ¨è¿™ä¸ªç‰©ä½“åé¢çš„é‚£ä¸ªç‰©ä½“
     public SkylineObject Next { get; set; }
 
 
+    //æ± å­
     [System.NonSerialized]
     Stack<SkylineObject> pool;
 
-    //Ìí¼ÓÒ»¸öÌì»¨°å==>Í¨¹ıÌí¼ÓÒ»¸ö´¹Ö±¼äÏ¶µÄ¿ÉÅäÖÃ·¶Î§
+    //ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ì»¨ï¿½ï¿½==>Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ï¶ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½Ã·ï¿½Î§
     [SerializeField]
     FloatRange gapY;
 
     public FloatRange GapY => gapY.Shift(transform.localPosition.y);
     public Vector3 PlaceAfter(Vector3 position)
-    {
+    {//å…ˆæŠŠä¸­å¿ƒç‚¹æŒªåŠä¸ªèŒƒå›´ï¼Œç„¶åå°†ç‰©ä½“æŒªåˆ°è¿™ä¸ªä½ç½®ï¼Œæœ€åæŒªåŠä¸ªèŒƒå›´ï¼Œä½¿æœ€åçš„ç‚¹åœ¨ç‰©ä½“çš„åæ–¹
         position.x += extents;
         transform.localPosition = position;
         position.x += extents;
@@ -49,9 +51,9 @@ public class SkylineObject : MonoBehaviour
 #endif
     public SkylineObject GetInstance()
     {
-        //Èç¹ûĞèÒª£¬´´½¨Ò»¸öĞÂ³Ø£¬
-        //È»ºó³¢ÊÔ´Ó³ØÖĞµ¯³öÒ»¸öÊµÀı²¢¼¤»îËü¡£
-        //Èç¹ûÊµÀı²»¿ÉÓÃ£¬Ôò»á´´½¨Ò»¸öĞÂÊµÀı²¢ÉèÖÃÆä³Ø¡£
+        //ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â³Ø£ï¿½
+        //È»ï¿½ï¿½ï¿½Ô´Ó³ï¿½ï¿½Ğµï¿½ï¿½ï¿½Ò»ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        //ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½á´´ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¡ï¿½
         if (pool == null)
         { 
             pool = new ();
