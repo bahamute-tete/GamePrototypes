@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RayMarchingShader_PBRRayMarching
+  m_Shader: {fileID: 4800000, guid: 1486144408031824ba7a97f44b15052e, type: 3}
+  m_ValidKeywords:
+  - _SEPARATE_TOP_MAPS
+  m_InvalidKeywords:
+  - TRIPLANAR_NONE
+  - _SEPARATE_TOP_MAPS_NONE
+  - _TRIPLANNAR_NONE
+  - _TRIPLANNER_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _CubemapEnvironment:
+        m_Texture: {fileID: 8900000, guid: 927f1165e7b6f7b49bf1f8dbf6ad7a9d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MOSMap:
+        m_Texture: {fileID: 2800000, guid: 721e0006ccd5ef64abea0e806ed8c207, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: 4461133173c4c6f4699bb1d9e2d83ba4, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalTex:
+        m_Texture: {fileID: 2800000, guid: debbe2657a1008e4cabc9c52ece0fc1c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopMOHSMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopMainTex:
+        m_Texture: {fileID: 2800000, guid: 1f9934364aefca64f9b17e7bee17b759, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - Triplanar: 0
+    - _FullImage: 0
+    - _GlowIntensity: 1
+    - _MapScale: 1
+    - _Metallic: 0.948
+    - _PowerValue: 2.2
+    - _Reflection: 0
+    - _Roughness: 0.176
+    - _SEPARATE_TOP_MAPS: 0
+    - _SSSValue: 0.57
+    - _ScaleValue: 2.04
+    - _Shiness: 64
+    - _SpecularScaler: 6.12
+    - _TRIPLANNAR: 0
+    - _TRIPLANNER: 1
+    - _WrapValue: 0.641
+    - _test: 0
+    m_Colors:
+    - _CameraPosition: {r: -0.17, g: 1.53, b: 3.49, a: 1}
+    - _Color: {r: 1, g: 0.7980342, b: 0.33490568, a: 1}
+    - _F0: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
+    - _GlowColor: {r: 0.2553463, g: 1, b: 0.1607843, a: 1}
+    - _TargetPosition: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []

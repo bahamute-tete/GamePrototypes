@@ -25,7 +25,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _NormalTexture:
-        m_Texture: {fileID: 2800000, guid: 993273ed3544344bf92c09c5677963ae, type: 3}
+        m_Texture: {fileID: 2800000, guid: b5e42375dca74b929795cf09ed8a6d66, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -48,7 +48,7 @@ Material:
     - _Cull: 0
     - _DstBlend: 10
     - _Float: 0.079
-    - _NormalStrenth: 3.13
+    - _NormalStrenth: 5.4
     - _Op: 0.16
     - _QueueControl: 0
     - _QueueOffset: 0
@@ -60,7 +60,7 @@ Material:
     - _ZWrite: 0
     - _ZWriteControl: 0
     m_Colors:
-    - _Color: {r: 0.30949628, g: 0.50899464, b: 0.6132076, a: 0.7450981}
+    - _Color: {r: 0.36196154, g: 0.73164827, b: 0.9245283, a: 0.50980395}
     - _ScreenUVOffset: {r: 0.1, g: 0.1, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &1343565116651331740

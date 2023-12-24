@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
   m_Name: Mask
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passTag: Mask
     Event: 250
@@ -97,7 +97,10 @@ MonoBehaviour:
   - {fileID: -872144875428058580}
   - {fileID: -7458637177587923542}
   - {fileID: 715730384738616976}
-  m_RendererFeatureMap: 2cea6e4bdb84e5f3aa85592901997d9890864c29fec8ee09
+  - {fileID: 1731071014734713490}
+  - {fileID: 5559320535419405363}
+  - {fileID: 809374157710507143}
+  m_RendererFeatureMap: 2cea6e4bdb84e5f3aa85592901997d9890864c29fec8ee0992d23c92eaff05183344358a92ac264d873cb71882793b0b
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -150,7 +153,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1614fc811f8f184697d9bee70ab9fe5, type: 3}
   m_Name: DecalRendererFeature
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   m_Settings:
     technique: 0
     maxDrawDistance: 1000
@@ -161,3 +164,67 @@ MonoBehaviour:
       useGBuffer: 1
   m_CopyDepthPS: {fileID: 4800000, guid: d6dae50ee9e1bfa4db75f19f99355220, type: 3}
   m_DBufferClear: {fileID: 4800000, guid: f056d8bd2a1c7e44e9729144b4c70395, type: 3}
+--- !u!114 &809374157710507143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: feb8eb912c8b2814a8cf2c813a58c2bc, type: 3}
+  m_Name: BlitMaterialFeature
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  setting:
+    overrideMaterial: {fileID: 0}
+    overrideMaterialPass: -1
+    colorTargetDestinationID: 
+    blitMaterial: {fileID: 2100000, guid: c7fecf89e561a7147b368bc53887a7d8, type: 2}
+--- !u!114 &1731071014734713490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2816289bf2d06cd4b80a6983d7ea9a44, type: 3}
+  m_Name: TestRenderFeature
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  material: {fileID: 2100000, guid: 5cbd92617438c384e8f160120bba1dc6, type: 2}
+  mesh: {fileID: 4300000, guid: 9110c3cdd57049ca9351bf53a80127f4, type: 3}
+--- !u!114 &5559320535419405363
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 819933cf95bc44d689240487683fe77a, type: 3}
+  m_Name: DepthNormalsFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+--- !u!114 &9092779212172597744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: feb8eb912c8b2814a8cf2c813a58c2bc, type: 3}
+  m_Name: BlitMaterialFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  setting:
+    overrideMaterial: {fileID: 0}
+    overrideMaterialPass: 0
+    colorTargetDestinationID: 
+    blitMaterial: {fileID: 0}

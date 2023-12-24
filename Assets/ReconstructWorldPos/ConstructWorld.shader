@@ -14,7 +14,7 @@ Shader "Custom/ConstructWorldPos"
         }
         LOD 100
 
-        ZWrite Off
+        ZWrite ON 
 
         Pass
         {
@@ -37,7 +37,10 @@ Shader "Custom/ConstructWorldPos"
             struct Varings{
                 float4 positionCS : SV_POSITION;
                 float4 screenPos : TEXCOORD0;
-                float2 uv : TEXCOORD1;
+                float3 dirWS:TEXCOORD1;
+                float3 dirVS:TEXCOORD2;
+                float3 positionWS:TEXCOORD3;
+                float2 uv : TEXCOORD4;
             };
 
 
@@ -45,9 +48,18 @@ Shader "Custom/ConstructWorldPos"
             Varings vert(Attributes input){
                 Varings o;
 
+                o.positionWS =TransformObjectToWorld(input.positionOS);
+
+                
+
+                o.dirWS= normalize( o.positionWS - _WorldSpaceCameraPos);
+                o.dirVS = TransformWorldToViewDir(o.dirWS);
+                
+
                 o.positionCS  = TransformObjectToHClip(input.positionOS);
-                o.uv = input.uv;
+
                 o.screenPos = ComputeScreenPos(o.positionCS);
+                o.uv = input.uv;
                 return o;
             }
 
@@ -87,6 +99,45 @@ Shader "Custom/ConstructWorldPos"
                 return worldPos;
             }
 
+            float3 custom_reconstruct_method2(float2 screenPos,float3 dirWS,float3 dirVS)
+            {
+                //dirVS 是方向向量所
+                //利用相似三角形eyeDepth/dirVS.z 的比例来缩放dirWS
+                float depth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, screenPos), _ZBufferParams);
+
+                dirWS*=-depth/dirVS.z;
+
+                float3 worldPos =_WorldSpaceCameraPos + dirWS;
+                return worldPos;
+            }
+
+            
+            float3 custom_reconstruct_method_test(float2 screenPos)
+            {
+
+                float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, screenPos);
+
+                float4 positionCS = float4(screenPos * 2.0 - 1.0, depth, 1.0);
+                positionCS.y = -positionCS.y;
+
+                float4 worldPos = mul(UNITY_MATRIX_I_VP, positionCS);
+
+                return worldPos/worldPos.w;
+            }
+
+            float3 custom_reconstruct_Normal(float3 worldPos)
+            {
+                float3 dx = ddx(worldPos);
+                float3 dy = ddy(worldPos);
+ 
+                #if UNITY_UV_STARTS_AT_TOP
+                    return -normalize(cross(dx,dy));
+                #else
+                    return normalize(cross(dx,dy));
+                #endif
+
+            }
+
 
             half4 frag(Varings i) : SV_TARGET
             {
@@ -94,15 +145,19 @@ Shader "Custom/ConstructWorldPos"
                 float2 uv = i.screenPos.xy / i.screenPos.w;
 
                 float depth = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, uv), _ZBufferParams);
-                float3 worldPos = custom_reconstruct_method(uv);
+                //float3 worldPos = custom_reconstruct_method2(uv,i.dirWS,i.dirVS);
+                float3 worldPos = offical_reconstruct_method(uv);
+                float3 normalWS = custom_reconstruct_Normal(worldPos);
+                float3 normalOS =TransformWorldToObjectNormal(normalWS);
 
                 uint3 worldIntPos =uint3(floor(abs(worldPos.xyz * 10)));
                 bool white = ((worldIntPos.x) & 1) ^ (worldIntPos.y & 1) ^ (worldIntPos.z & 1);
                 color = white ? half4(1,1,1,1) : half4(0,0,0,1);
 
-                if(depth > 0.9999) discard;
+                //if(depth > 0.9999) discard;
                 //color = depth;
 
+                //color = saturate(dot(normalWS,float3(1,2,3)));
         
                 return half4(color,1);
             }
