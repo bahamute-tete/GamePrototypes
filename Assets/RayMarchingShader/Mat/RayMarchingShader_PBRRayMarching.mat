@@ -10,9 +10,13 @@ Material:
   m_Name: RayMarchingShader_PBRRayMarching
   m_Shader: {fileID: 4800000, guid: 1486144408031824ba7a97f44b15052e, type: 3}
   m_ValidKeywords:
+  - _FULLIMAGE
+  - _RAYMARCHING_REFLECTION
   - _SEPARATE_TOP_MAPS
   m_InvalidKeywords:
   - TRIPLANAR_NONE
+  - _FULLIMAGE_ON
+  - _REFLECTION_ON
   - _SEPARATE_TOP_MAPS_NONE
   - _TRIPLANNAR_NONE
   - _TRIPLANNER_ON
@@ -60,13 +64,13 @@ Material:
     m_Ints: []
     m_Floats:
     - Triplanar: 0
-    - _FullImage: 0
+    - _FullImage: 1
     - _GlowIntensity: 1
     - _MapScale: 1
-    - _Metallic: 0.948
+    - _Metallic: 1
     - _PowerValue: 2.2
-    - _Reflection: 0
-    - _Roughness: 0.176
+    - _Reflection: 1
+    - _Roughness: 0.362
     - _SEPARATE_TOP_MAPS: 0
     - _SSSValue: 0.57
     - _ScaleValue: 2.04
@@ -78,8 +82,8 @@ Material:
     - _test: 0
     m_Colors:
     - _CameraPosition: {r: -0.17, g: 1.53, b: 3.49, a: 1}
-    - _Color: {r: 1, g: 0.7980342, b: 0.33490568, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _F0: {r: 0.9245283, g: 0.9245283, b: 0.9245283, a: 1}
-    - _GlowColor: {r: 0.2553463, g: 1, b: 0.1607843, a: 1}
+    - _GlowColor: {r: 0.5186184, g: 1, b: 0.1607843, a: 1}
     - _TargetPosition: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []

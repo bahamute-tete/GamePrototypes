@@ -11,6 +11,7 @@ Material:
   m_Shader: {fileID: 4800000, guid: 8f738f40cd2699b47b712cd924612181, type: 3}
   m_ValidKeywords: []
   m_InvalidKeywords:
+  - _HAIR_OFF
   - _RAMP_MAP_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -25,13 +26,29 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _RampTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _StretchedNoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AnisotropicPowerScale: 3.64
+    - _AnisotropicPowerValue: 12.3
     - _ColorPos: 0
     - _Glossiness: 10
+    - _HAIR: 0
     - _RAMP_MAP: 0
+    - _RimBloomExp: 1
+    - _RimMax: 1
+    - _RimMin: 0
+    - _RimSmooth: 0.5
     - _ShadowRange: 0.639
     - _ShadowSmooth: 0
+    - _ShiftTangent: 0.5
     - _Thickness: 0.0064
     m_Colors:
     - _Color1: {r: 0.1981132, g: 0.1981132, b: 0.1981132, a: 0.14117648}

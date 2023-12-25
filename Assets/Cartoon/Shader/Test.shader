@@ -166,7 +166,7 @@ Shader "RayMarchingShader/Test"
             {
                 GradientColor g;
                 g.colorsLength =3;
-                g.type = 1;
+                g.type = 0;
                
                 g.colors[0] = color1;
                 g.colors[1] = color2;

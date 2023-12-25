@@ -154,7 +154,7 @@ Shader "Custom/ConstructWorldPos"
                 bool white = ((worldIntPos.x) & 1) ^ (worldIntPos.y & 1) ^ (worldIntPos.z & 1);
                 color = white ? half4(1,1,1,1) : half4(0,0,0,1);
 
-                //if(depth > 0.9999) discard;
+                if(depth > 0.9999) discard;
                 //color = depth;
 
                 //color = saturate(dot(normalWS,float3(1,2,3)));
