@@ -1,0 +1,72 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "../RayMarchingShader/HLSL/RandomTools.hlsl"
+
+
+//#define PI 3.1415926535897932384626433832795
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+// struct SphereCheck
+// {
+//     float4 position;
+//     int culled;
+//     float r;
+    
+// };
+
+// RWStructuredBuffer<SphereCheck> spheres;
+
+RWStructuredBuffer<float4> spherePos;
+RWBuffer<int> res;
+
+uint  resolution;
+float radius;
+float _Wavelength;
+
+float _Steepness;
+float2 _Direction;
+
+float4 _FP[6];
+
+float4 _WaveA,_WaveB,_WaveC ;//dirX,dirY, steepness, wavelength
+
+float3 GerstnerWave (float4 wave, float3 p)
+{
+    float k = 2.0 * PI / wave.w;
+    float a = wave.z / k;
+    float2 d = normalize(wave.xy);
+    float c = sqrt(9.8 / k);
+    float f = k * (dot(d, p.xz) - c * _Time.y);
+    return float3(d.x *( a * cos(f)), a * sin(f),d.y *( a * cos(f)));
+
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+
+    int  index = id.x+id.y*resolution;
+    float4 p =spherePos[index];
+    //p.y= FBMNoise2D(p.xz,0.01)*5;
+
+    p.xyz+=GerstnerWave(_WaveA,p.xyz);
+    p.xyz+=GerstnerWave(_WaveB,p.xyz);
+    p.xyz+=GerstnerWave(_WaveC,p.xyz);
+    
+
+    res[index] =0;
+
+    for(int i =0;i <6 ;i++)
+    {
+        float4 plane =_FP[i]; 
+        float dist = dot(plane,p);
+        if (dist<=-radius)
+             res[index] =1;
+    }
+
+    spherePos[index]=p;
+
+}

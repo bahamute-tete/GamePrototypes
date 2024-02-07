@@ -1,0 +1,157 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+float4 ro;
+float4 rd;
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWStructuredBuffer<float3> vertices;
+RWStructuredBuffer<float3> normals;
+RWStructuredBuffer<int> tirs;
+
+
+struct Triangle
+{
+    float3 vertex0;
+    float3 normal0;
+
+    float3 vertex1;
+    float3 normal1;
+
+    float3 vertex2;
+    float3 normal2;
+
+};
+RWStructuredBuffer<Triangle> Triangles;
+
+struct HitInfo
+{
+    float3 hitPos;
+    float t;
+    float3 normal;
+    float beta;
+    float gama;
+};
+RWStructuredBuffer<HitInfo> hitInfo;
+
+RWBuffer<int> hitedIndex;
+
+float4x4 localToWorld;
+float4x4 worldToLocal;
+
+
+
+float3 getFaceNormal(Triangle tri)
+{
+    float3 na =mul(transpose(worldToLocal),float4(tri.normal0,0.0)).xyz;
+    float3 nb =mul(transpose(worldToLocal),float4(tri.normal1,0.0)).xyz;
+    float3 nc =mul(transpose(worldToLocal),float4(tri.normal2,0.0)).xyz;
+    float3 faceNormal =normalize(na+nb+nc);
+    return faceNormal;
+}
+
+float3 getPixleNormal(Triangle tri,float beta,float gama)
+{
+    
+    float3 pixleNormal = (1.0 - beta - gama) * tri.normal0 + beta * tri.normal1 + gama * tri.normal2;
+    float3 normalOS=normalize(pixleNormal);
+    float3 normalWS =mul(transpose(worldToLocal),float4(normalOS,0.0)).xyz;
+    return normalWS;
+}
+
+
+float HitCheck(float3 ro,float3 rd ,Triangle tri,float tmin,float tmax,out float beta ,out float gama)
+{
+
+    float t = 0;
+    beta =0.0;
+    gama =0.0;
+
+
+    float3 a =mul(localToWorld,float4(tri.vertex0,1.0)).xyz;
+    float3 b =mul(localToWorld,float4(tri.vertex1,1.0)).xyz;
+    float3 c =mul(localToWorld,float4(tri.vertex2,1.0)).xyz;
+
+     float3x3 M = float3x3( a.x - b.x, a.x - c.x, rd.x,
+                            a.y - b.y, a.y - c.y, rd.y,
+                            a.z - b.z, a.z - c.z, rd.z);
+
+    float3x3 BETA = float3x3(a.x - ro.x, a.x - c.x, rd.x,
+                              a.y - ro.y, a.y - c.y, rd.y,
+                              a.z - ro.z, a.z - c.z, rd.z);
+
+    float3x3 GAMA = float3x3(a.x - b.x, a.x - ro.x, rd.x,
+                             a.y - b.y, a.y - ro.y, rd.y,
+                             a.z - b.z, a.z - ro.z, rd.z );
+
+    float3x3 T = float3x3(a.x - b.x, a.x - c.x, a.x - ro.x,
+                          a.y - b.y, a.y - c.y, a.y - ro.y,
+                          a.z - b.z, a.z - c.z, a.z - ro.z);
+   {
+    // float3x3 M = float3x3( tri.vertex0.x - tri.vertex1.x, tri.vertex0.x - tri.vertex2.x, rd.x,
+    //                        tri.vertex0.y - tri.vertex1.y, tri.vertex0.y - tri.vertex2.y, rd.y,
+    //                        tri.vertex0.z - tri.vertex1.z, tri.vertex0.z - tri.vertex2.z, rd.z);
+
+    // float3x3 BETA = float3x3( tri.vertex0.x - ro.x,  tri.vertex0.x - tri.vertex2.x, rd.x,
+    //                           tri.vertex0.y - ro.y,  tri.vertex0.y - tri.vertex2.y, rd.y,
+    //                           tri.vertex0.z - ro.z,  tri.vertex0.z - tri.vertex2.z, rd.z);
+
+    // float3x3 GAMA = float3x3(tri.vertex0.x - tri.vertex1.x, tri.vertex0.x - ro.x, rd.x,
+    //                          tri.vertex0.y - tri.vertex1.y, tri.vertex0.y - ro.y, rd.y,
+    //                          tri.vertex0.z - tri.vertex1.z, tri.vertex0.z - ro.z, rd.z );
+
+    // float3x3 T = float3x3(tri.vertex0.x - tri.vertex1.x, tri.vertex0.x - tri.vertex2.x, tri.vertex0.x - ro.x,
+    //                       tri.vertex0.y - tri.vertex1.y, tri.vertex0.y - tri.vertex2.y, tri.vertex0.y - ro.y,
+    //                       tri.vertex0.z - tri.vertex1.z, tri.vertex0.z - tri.vertex2.z, tri.vertex0.z - ro.z);
+   }
+
+   if (determinant(M) ==0)
+       return 0.0;
+
+    t = determinant(T) / determinant(M);
+    if (t < tmin || t > tmax)
+        return 0.0;
+
+    gama = determinant(GAMA) / determinant(M);
+    if (gama < 0.0 || gama > 1.0)
+        return 0.0;
+
+        
+
+    beta = determinant(BETA) / determinant(M);
+    if (beta < 0.0 || beta > 1.0- gama)
+        return 0.0;
+
+   return t;
+
+}
+
+[numthreads( 64, 1, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float nonZeroMin =1e6;
+    float beta=0.0;
+    float gama=0.0;
+    float t =HitCheck(ro.xyz,rd.xyz ,Triangles[id.x],0.0,100.0, beta,gama);
+
+    float3 faceNormal =getFaceNormal(Triangles[id.x]);
+
+    float3 pixleNormal = float3(0,1,0);
+    if(t>0.0) pixleNormal = getPixleNormal(Triangles[id.x],beta,gama);
+    
+        
+
+
+    hitInfo[id.x].t = 0;
+    if (dot(rd.xyz,faceNormal)<0.0)
+         hitInfo[id.x].t = t;
+
+    hitInfo[id.x].hitPos = ro.xyz+rd.xyz*t;
+    hitInfo[id.x].normal = pixleNormal;
+    hitInfo[id.x].beta = beta;
+    hitInfo[id.x].gama = gama;
+
+}
+
+
+

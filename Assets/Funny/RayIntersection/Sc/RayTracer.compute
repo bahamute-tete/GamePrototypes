@@ -1,0 +1,88 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+
+struct TriangleTest
+{
+    float3 p0, p1, p2;    
+};
+StructuredBuffer<TriangleTest> tri;
+
+struct hitRecord
+{
+    bool isHited;
+    float t;
+    float3 hitPos;
+    float gama;
+    float beta;
+};
+
+float4 triangles;
+RWStructuredBuffer<hitRecord> hit;
+
+float3 ro;
+float3 rd;
+float tmin, tmax;
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> Result;
+
+[numthreads(15,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    float t = 0;
+    
+    float3x3 A = float3x3(         tri[id.x].p0.x - tri[id.x].p1.x, tri[id.x].p0.x - tri[id.x].p2.x, rd.x,
+                                   tri[id.x].p0.y - tri[id.x].p1.y, tri[id.x].p0.y - tri[id.x].p2.y, rd.y,
+                                   tri[id.x].p0.z - tri[id.x].p1.z, tri[id.x].p0.z - tri[id.x].p2.z, rd.z);
+
+    float3x3 BETA = float3x3(         tri[id.x].p0.x - ro.x, tri[id.x].p0.x - tri[id.x].p2.x, rd.x,
+                                      tri[id.x].p0.y - ro.y, tri[id.x].p0.y - tri[id.x].p2.y, rd.y,
+                                      tri[id.x].p0.z - ro.z, tri[id.x].p0.z - tri[id.x].p2.z, rd.z );
+
+    float3x3 GAMA = float3x3(         tri[id.x].p0.x - tri[id.x].p1.x, tri[id.x].p0.x - ro.x, rd.x,
+                                      tri[id.x].p0.y - tri[id.x].p1.y, tri[id.x].p0.y - ro.y, rd.y,
+                                      tri[id.x].p0.z - tri[id.x].p1.z, tri[id.x].p0.z - ro.z, rd.z);
+
+    float3x3 T = float3x3(        tri[id.x].p0.x - tri[id.x].p1.x, tri[id.x].p0.x - tri[id.x].p2.x, tri[id.x].p0.x - ro.x,
+                                  tri[id.x].p0.y - tri[id.x].p1.y, tri[id.x].p0.y - tri[id.x].p2.y, tri[id.x].p0.y - ro.y,
+                                  tri[id.x].p0.z - tri[id.x].p1.z, tri[id.x].p0.z - tri[id.x].p2.z, tri[id.x].p0.z - ro.z );
+    
+    t = (determinant(A) == 0) ? 0.0f : determinant(T) / determinant(A);
+    
+    if (t < tmin || t > tmax)
+    {
+        hit[id.x].isHited = false;
+    }
+
+    float gama = determinant(GAMA) / determinant(A);
+    if (gama < 0.0 || gama > 1.0f)
+    {
+        hit[id.x].isHited = false;
+    }
+           
+
+    float beta = determinant(BETA) / determinant(A);
+    if (beta < 0.0f || beta > 1.0f - gama)
+    {
+        hit[id.x].isHited = false;
+    }
+
+
+    if (hit[id.x].isHited)
+    {
+        hit[id.x].t = t;
+        hit[id.x].gama = gama;
+        hit[id.x].beta = beta;
+        hit[id.x].hitPos =ro+rd*t;
+    }
+    else
+    {
+        hit[id.x].t = 0;
+        hit[id.x].gama = 0f;
+        hit[id.x].beta = 0f;
+        hit[id.x].hitPos = ro;
+    }
+
+}

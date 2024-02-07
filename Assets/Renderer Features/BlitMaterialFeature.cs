@@ -66,7 +66,7 @@ public class BlitMaterialFeature : ScriptableRendererFeature
     BlitMaterialPass blitMaterialPass;
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        //if (renderingData.cameraData.camera != Camera.main) return;
+        if (renderingData.cameraData.camera != Camera.main) return;
 
         if (setting.blitMaterial != null)
         {

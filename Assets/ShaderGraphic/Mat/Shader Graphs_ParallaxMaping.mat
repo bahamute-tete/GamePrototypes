@@ -66,17 +66,17 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Default: 1
+    - _Default: 0
     - _ENUM: 0
     - _Float: 0
     - _Interpolate: 0
-    - _Metallic: 0
+    - _Metallic: 0.376
     - _ParallaxBias: 0.42
     - _ParallaxStrenth: 0.1
     - _QueueControl: 0
     - _QueueOffset: 0
     - _RAYMARCHING: 1
-    - _Smoothness: 0
+    - _Smoothness: 0.412
     - _StepSize: 20
     - _maxRayMarchingSteps: 10
     m_Colors:

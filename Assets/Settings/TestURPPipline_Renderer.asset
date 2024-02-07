@@ -51,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
   m_Name: SeeThrough
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passTag: SeeThrough
     Event: 300
@@ -100,7 +100,8 @@ MonoBehaviour:
   - {fileID: 1731071014734713490}
   - {fileID: 5559320535419405363}
   - {fileID: 809374157710507143}
-  m_RendererFeatureMap: 2cea6e4bdb84e5f3aa85592901997d9890864c29fec8ee0992d23c92eaff05183344358a92ac264d873cb71882793b0b
+  - {fileID: 5796889281599368644}
+  m_RendererFeatureMap: 2cea6e4bdb84e5f3aa85592901997d9890864c29fec8ee0992d23c92eaff05183344358a92ac264d873cb71882793b0bc4edff9f16b07250
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -181,7 +182,7 @@ MonoBehaviour:
     overrideMaterial: {fileID: 0}
     overrideMaterialPass: -1
     colorTargetDestinationID: 
-    blitMaterial: {fileID: 2100000, guid: 826a4825961ad9e45b77e85a45e23978, type: 2}
+    blitMaterial: {fileID: 2100000, guid: 9a51ba29dfa148a4f80a9073c4336337, type: 2}
 --- !u!114 &1731071014734713490
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -209,7 +210,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 819933cf95bc44d689240487683fe77a, type: 3}
   m_Name: DepthNormalsFeature
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
+--- !u!114 &5796889281599368644
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54c3bc7ec17e0ee47a805c36e33fbaa7, type: 3}
+  m_Name: ScreenBlurFeature
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  settings:
+    downSampe: 1
+    spread: 20
+    gridSize: 121
+    filterType: 1
+    renderPass: 300
+    shader: {fileID: 4800000, guid: fa179c1f0fa7c2c4da01f607b656c605, type: 3}
 --- !u!114 &9092779212172597744
 MonoBehaviour:
   m_ObjectHideFlags: 0
