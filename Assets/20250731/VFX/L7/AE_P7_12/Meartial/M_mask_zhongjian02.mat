@@ -1,0 +1,240 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_mask_zhongjian02
+  m_Shader: {fileID: 4800000, guid: 61d6e26e69d3e9a41b815f85a6e8fde0, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _BLENDMODE_ADD
+  - _DISSOLVE_NO_DISSOLVE
+  - _ORM_METALLIC
+  - _PBR_SHADING_MODE_ORM_OR_MSO_MODE
+  - _USEALPHACLIP
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _CutoutTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MASEMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: f79d95efad49a8e4b8dccb7bd2384dc6, type: 3}
+        m_Scale: {x: 800, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TextureSample0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 10, y: 1}
+        m_Offset: {x: 0, y: -0.12}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AOMap_Intensity: 1
+    - _AOMap_ORM_Intensity: 1
+    - _Albedo_Strength: 1
+    - _AlphaClip: 0
+    - _AlphaCutoff: 0.5
+    - _BaseMapTex: 0
+    - _Blend: 0
+    - _BlendMode: 0
+    - _BlinnPhongLight: 0
+    - _BumpScale: 1
+    - _ClearCoatMask: 0
+    - _ClearCoatSmoothness: 0
+    - _ClipingCutout: 0.5
+    - _Cull: 2
+    - _CullMode: 1
+    - _Cutoff: 0.5
+    - _CutoffHeight: 0
+    - _CutoffHeight1: 0
+    - _Cutout: 1
+    - _CutoutThreshold: 0.015
+    - _DetailAlbedoMapScale: 1
+    - _DetailNormalMapScale: 1
+    - _Dissolve: 0
+    - _DstBlend: 0
+    - _DstMode: 1
+    - _EdgeWidth: 0
+    - _EmissionMapTex: 0
+    - _Emission_Intensity: 1
+    - _EnvironmentReflections: 1
+    - _FogIntensity: 1
+    - _FresnelFadeFactor: 3
+    - _FresnelPow: 5
+    - _FresnelR0: 0.04
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _InvFade: 1
+    - _InverseColor: 0
+    - _LineWidth: 0.05
+    - _MainProperties: 0
+    - _Metallic: 0
+    - _MetallicMap_Intensity: 1
+    - _MetallicMap_ORM_Intensity: 1
+    - _MetallicValue: 0
+    - _NormalMapTex: 0
+    - _Normal_Scale: 1
+    - _ORMMapTex: 0
+    - _ORM_AO: 0
+    - _ORM_Metallic: 1
+    - _OcclusionStrength: 1
+    - _PBR_Shading_Mode: 0
+    - _Parallax: 0.005
+    - _PlaneNormalOS: 0
+    - _QueueControl: 0
+    - _QueueOffset: 23
+    - _ReceiveShadows: 1
+    - _Smoothness: 0.5
+    - _SmoothnessMap_Intensity: 1
+    - _SmoothnessTextureChannel: 0
+    - _SmoothnessValue: 0
+    - _SoftInverted: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _SrcMode: 5
+    - _StencilComp: 3
+    - _StencilFail: 0
+    - _StencilMask: 15
+    - _StencilPass: 0
+    - _StencilZFail: 0
+    - _Surface: 0
+    - _UV0_OR_UV1: 0
+    - _UseAOMap: 0
+    - _UseAlphaClip: 1
+    - _UseClipPlane: 0
+    - _UseCutout: 0
+    - _UseCutoutTex: 0
+    - _UseCutoutThreshold: 0
+    - _UseEmissionMap: 0
+    - _UseFogControl: 0
+    - _UseFrameBlending: 0
+    - _UseFresnel: 0
+    - _UseFresnelFading: 0
+    - _UseMetallicMap: 0
+    - _UseNoiseDistortion: 0
+    - _UseParticlesAlphaCutout: 0
+    - _UseRoughnessMap: 0
+    - _UseSecondClipPlane: 0
+    - _UseSmoothnessMap: 0
+    - _UseSoft: 0
+    - _UseSoftCutout: 0
+    - _UseVertexStreamRandom: 0
+    - _Use_AOMap_MetallicAlpha: 0
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    - _ZWriteMode: 0
+    - _color: 8.14
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BoundsMin: {r: 0, g: 0, b: 0, a: 0}
+    - _BoundsSize: {r: 0, g: 0, b: 0, a: 0}
+    - _ClipPlane: {r: 1, g: 0, b: 0, a: 0}
+    - _ClipPlane2: {r: 0, g: 0, b: 1, a: 0}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorInside: {r: 1, g: 1, b: 1, a: 1}
+    - _CutoutColor: {r: 1, g: 1, b: 1, a: 1}
+    - _DissloveXYZ: {r: 0, g: 1, b: 0, a: 0}
+    - _DistortionSpeedScale: {r: 1, g: -1, b: 0.15, a: 0.15}
+    - _EdgeColor: {r: 0, g: 0, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FogColorMultiplier: {r: 0, g: 0, b: 0, a: 0}
+    - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Groundcolor: {r: 0.8962264, g: 0.32963058, b: 0, a: 0}
+    - _InnerHelecolor: {r: 0.9056604, g: 0.1954532, b: 0, a: 0}
+    - _LineColor: {r: 1, g: 1, b: 1, a: 1}
+    - _MainTexUVCoord: {r: 1, g: 1, b: 0, a: 0}
+    - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _TintColor: {r: 0.4811321, g: 0.16853365, b: 0.057493728, a: 1}
+  m_BuildTextureStacks: []
+--- !u!114 &8547754989870983668
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 5

@@ -1,0 +1,91 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
+  m_Name: Global Volume Profile
+  m_EditorClassIdentifier: 
+  components:
+  - {fileID: 1563691201158013404}
+  - {fileID: 2387199753356180847}
+--- !u!114 &1563691201158013404
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46bb99e8856c39543a45d6ebcebe15e3, type: 3}
+  m_Name: MobileBloomVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 1
+  threshold:
+    m_OverrideState: 1
+    m_Value: 0.8
+  softKnee:
+    m_OverrideState: 1
+    m_Value: 0.807
+  intensity:
+    m_OverrideState: 1
+    m_Value: 2.87
+  tint:
+    m_OverrideState: 1
+    m_Value: {r: 1, g: 0.9617026, b: 0.9025157, a: 1}
+  scatter:
+    m_OverrideState: 1
+    m_Value: 0.804
+  iterations:
+    m_OverrideState: 1
+    m_Value: 3
+  halfResolutionStart:
+    m_OverrideState: 1
+    m_Value: 1
+--- !u!114 &2387199753356180847
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41bf4842c6e8c514ba5c03dfa662f3b6, type: 3}
+  m_Name: GodRayVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0.5
+  threshold:
+    m_OverrideState: 1
+    m_Value: 0.679
+  blurStrength:
+    m_OverrideState: 1
+    m_Value: 1.524
+  blurFalloff:
+    m_OverrideState: 1
+    m_Value: 0.956
+  sampleCount:
+    m_OverrideState: 1
+    m_Value: 12
+  tintColor:
+    m_OverrideState: 1
+    m_Value: {r: 0.49371064, g: 0.7724883, b: 1, a: 1}
+  skyOnly:
+    m_OverrideState: 1
+    m_Value: 0
+  sunDiscIntensity:
+    m_OverrideState: 1
+    m_Value: 0
+  sunDiscSize:
+    m_OverrideState: 1
+    m_Value: 0.005

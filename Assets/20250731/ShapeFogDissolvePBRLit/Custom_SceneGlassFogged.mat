@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Custom_SceneGlassFogged
+  m_Shader: {fileID: 4800000, guid: da28bb969c2a0b9439b3a09871b7aac2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FOG_AFFECTS_GLASS
+  - _USE_PBR
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _DissolveNoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: b5aa3058ea174cf40b54cc6b6629c09f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Cull: 2
+    - _DissolveAmount: 0
+    - _DissolveAxisCenter: 0
+    - _DissolveBrightnessPower: 2
+    - _DissolveEdgeIntensity: 3
+    - _DissolveEdgeWidth: 0.1
+    - _DissolveMode: 0
+    - _DissolveNoiseScale: 2
+    - _DissolveRadialReverse: 0
+    - _DissolveSpace: 1
+    - _DissolveUseNoiseTex: 0
+    - _FogEnable: 1
+    - _FresnelIntensity: 0
+    - _FresnelPower: 4.15
+    - _Metallic: 0
+    - _NormalScale: 1
+    - _ReflectIntensity: 0
+    - _RefractStrength: 0.02
+    - _RefractionEnable: 0
+    - _Smoothness: 0.515
+    - _SpecIntensity: 1
+    - _UseMaps: 0
+    - _UsePBR: 1
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DissolveAxis: {r: 0, g: 1, b: 0, a: 1}
+    - _DissolveEdgeColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+    - _DissolveRadial: {r: 0, g: 0, b: 0, a: 1}
+    - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []

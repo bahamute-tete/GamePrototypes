@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_chongji 5
+  m_Shader: {fileID: 4800000, guid: 8f4db49ab34e0eb4d9b66181272663e6, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _123:
+        m_Texture: {fileID: 2800000, guid: 7e8542cc3380b0445a91e2c95f96efd5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TextureSample0:
+        m_Texture: {fileID: 2800000, guid: 0ba5ee5f7de73fb4dbd4f5bae4aa553d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TextureSample1:
+        m_Texture: {fileID: 2800000, guid: 2e752e203c576564db3dbb4e233fe8de, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _raodong:
+        m_Texture: {fileID: 2800000, guid: 04c39ee89e3e1f6468f0a17a30e6dff3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _vfx_yuanhuan14:
+        m_Texture: {fileID: 2800000, guid: 2e752e203c576564db3dbb4e233fe8de, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutoff: 0.5
+    - _Float0: 5.48
+    - _Float1: 3.39
+    - _Float2: 0.2
+    - _Main01_U: 1
+    - _Main01_V: 1
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _YShow: 0.637
+    - _YShowSMax: 0.73
+    - _YShowSMin: 1.71
+    - _main01_speedX: 0
+    - _main01_speedX1: 0
+    - _main01_speedY: 0
+    - _main01_speedY1: 1
+    - _main05_speedX: 0.02
+    - _main05_speedY: 0
+    - _raodong_X: 1
+    - _raodong_Y: 0
+    - _raoodong_int: 0
+    m_Colors:
+    - _Color0: {r: 2.6501725, g: 3.159821, b: 4.867144, a: 0}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Vector0: {r: 1.59, g: 0, b: 0, a: 0}
+    - _Vector1: {r: 3, g: 3, b: 0, a: 0}
+    - _zong: {r: 4, g: 1.0756277, b: 0, a: 0}
+    - _zong_color: {r: 1.1486983, g: 1.1486983, b: 1.1486983, a: 0}
+  m_BuildTextureStacks: []

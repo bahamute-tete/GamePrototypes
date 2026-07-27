@@ -1,0 +1,179 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel InitializeRandom
+#pragma kernel UpdateCells
+#pragma kernel ClearCells
+#pragma kernel PlacePattern
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float> currentState;
+// Compute Shader 读写逻辑：
+//虽然在某些硬件上可以直接读取 RWTexture2D，但为了兼容性和规范性，
+//在 Update 阶段最好将上一帧的状态作为 Texture2D (只读) 绑定，
+//将下一帧的状态作为 RWTexture2D (读写) 绑定。
+Texture2D<float> readState;
+RWTexture2D<float> nextState;
+
+StructuredBuffer<int2> patternPositions;
+int  patternCount;
+int2 patternOffset;
+
+int width;
+int height;
+float probability;
+uint seed;
+
+
+float Random (uint2 id)
+{
+    //随机数生成问题：在 Compute Shader 中，Random 函数使用了 sin，
+    //并且将 seed 乘以了一个非常大的数。这会导致浮点数精度溢出，
+    //使得 sin 的结果在某些 GPU 上变为 NaN 或无效值，导致初始化失败（全死或全活）
+    //return frac(sin(id.x * 12.9898 + id.y * 78.233 + seed * 43758.5453) * 43758.5453);
+    float2 st = float2(id.x, id.y);
+    // 使用 seed 偏移坐标，而不是乘法，避免溢出
+    st += float2(seed % 1000, (seed / 1000) % 1000); 
+    return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
+}
+
+[numthreads(8,8,1)]
+void InitializeRandom (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    if (id.x >= (uint)width || id.y >= (uint)height) return;
+    float _randValue = Random(id.xy);
+    currentState[id.xy] = _randValue< probability ? 1.0 : 0.0;
+}
+
+
+[numthreads(8,8,1)]
+void ClearCells (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    if (id.x >= (uint)width || id.y >= (uint)height) return;
+    currentState[id.xy] = 0.0;
+}
+
+
+int GetNeighborsCount(uint2 id)
+{
+    int count = 0;
+    
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0)
+                continue;
+            
+            int2 neighborPos = int2(id.x + dx, id.y + dy);
+            
+            // 边界检查
+            if (neighborPos.x >= 0 && neighborPos.x < width && 
+                neighborPos.y >= 0 && neighborPos.y < height)
+            {
+                if (readState[neighborPos] > 0.5)
+                    count++;
+            }
+        }
+    }
+    
+    return count;
+}
+
+int GetNeighborsCountWrap(uint2 id)
+{
+    int count = 0;
+    
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0)
+                continue;
+            
+            // 先转为 int 进行加减，防止 uint 下溢
+            int nx = (int)id.x + dx;
+            int ny = (int)id.y + dy;
+
+            // Wrap 核心逻辑：
+            // 加上 width/height 确保被除数为正，然后取模
+            // 例如：当 nx = -1 时，(-1 + width) % width = width - 1 (最右侧)
+            // 例如：当 nx = width 时，(width + width) % width = 0 (最左侧)
+            nx = (nx + width) % width;
+            ny = (ny + height) % height;
+            
+            if (readState[int2(nx, ny)] > 0.5)
+                count++;
+        }
+    }
+    
+    return count;
+}
+
+// B3/S23
+float Rule(float currentState, int aliveNeighborsCount)
+{
+    bool isAlive = currentState > 0.5;
+
+    if (isAlive)
+    {
+        if (aliveNeighborsCount < 2 || aliveNeighborsCount > 3)
+            return 0.0;
+        else
+            return 1.0;
+    }
+    else
+    {
+        if (aliveNeighborsCount == 3)
+            return 1.0;
+        else
+            return 0.0;
+    }
+}
+
+// B4/S5
+float RuleCave(float currentState, int aliveNeighborsCount)
+{
+    bool isAlive = currentState > 0.5;
+
+    if (isAlive) // 当前是墙
+    {
+        // 规则：如果周围墙的数量 >= 4，则保持为墙，否则变为地板
+        return aliveNeighborsCount >= 4 ? 1.0 : 0.0;
+    }
+    else // 当前是地板
+    {
+        // 规则：如果周围墙的数量 >= 5，则变为墙，否则保持为地板
+        return aliveNeighborsCount >= 5 ? 1.0 : 0.0;
+    }
+}
+
+
+[numthreads(8,8,1)]
+void UpdateCells (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    if (id.x >= (uint)width || id.y >= (uint)height) return;
+    float _currentState=readState[id.xy];
+    //int aliveNeighborsCount = GetNeighborsCount(id.xy);
+    int aliveNeighborsCount = GetNeighborsCountWrap(id.xy);
+    nextState[id.xy] = Rule(_currentState, aliveNeighborsCount);
+}
+
+
+[numthreads(8,1,1)]
+void PlacePattern (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)patternCount) return;
+
+    int2 pos = patternPositions[id.x] + patternOffset;
+
+    // 边界检查
+    if (pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height)
+    {
+        currentState[pos] = 1.0;
+    }
+}
+
+

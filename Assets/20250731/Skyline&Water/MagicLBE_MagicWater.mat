@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MagicLBE_MagicWater
+  m_Shader: {fileID: 4800000, guid: 58a4baa5338f9cb4491c9a08698a8e1a, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _EdgeTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LightSpot1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LightSpot2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap1:
+        m_Texture: {fileID: 2800000, guid: e2f8ecb10d5a67f4f9e3d41a3b371653, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ReflectionCube:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ReflectionCubeA:
+        m_Texture: {fileID: 8900000, guid: 5734983fc81450b4187c3cfa5985edef, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ReflectionCubeB:
+        m_Texture: {fileID: 8900000, guid: 5b5fec16d4a35bf4ca0f7ea2aaf59244, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _CubemapBlur: 2
+    - _DepthFadeEnd: 400
+    - _DepthFadeStart: 50
+    - _EdgeCoreSharp: 3.8
+    - _EdgeCoreStrength: 1.356
+    - _EdgeDistance: 1.64
+    - _EdgeFalloff: 0.5
+    - _EdgeTiling: 0.2
+    - _FadeEnd: 300
+    - _FadeStart: 10
+    - _FogDensity: 0
+    - _FogMaxDepth: 10
+    - _FresnelBias: 0.081
+    - _FresnelPower: 10
+    - _LightSpot1Tiling: -0.03
+    - _LightSpot2Tiling: 0.05
+    - _NormalScale: 0.01
+    - _NormalTiling: 0.1
+    - _PlanarBlur: 0
+    - _PlanarDistortion: 0.068
+    - _ReflectionStrength: 1
+    - _UseEdgeLight: 0
+    - _UsePlanarReflection: 0
+    m_Colors:
+    - _BaseColor: {r: 0.022173883, g: 0.052860655, b: 0.111932434, a: 1}
+    - _EdgeColor: {r: 0.26461014, g: 0.22918412, b: 0.45836833, a: 1}
+    - _EdgeScroll: {r: 0.03, g: 0.06, b: 0, a: 0}
+    - _FogColor: {r: 0, g: 0, b: 0, a: 1}
+    - _LightSpot1Color: {r: 0, g: 0, b: 0, a: 1}
+    - _LightSpot1Scroll: {r: 0.01, g: 0.01, b: 0, a: 0}
+    - _LightSpot2Color: {r: 0, g: 0, b: 0, a: 1}
+    - _LightSpot2Scroll: {r: -0.01, g: 0.015, b: 0, a: 0}
+    - _NormalScroll1: {r: 0, g: 0, b: 0, a: 0}
+    - _NormalScroll2: {r: -0.02, g: 0.04, b: 0, a: 0}
+  m_BuildTextureStacks: []

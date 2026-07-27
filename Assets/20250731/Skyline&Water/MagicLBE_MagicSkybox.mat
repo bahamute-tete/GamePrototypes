@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MagicLBE_MagicSkybox
+  m_Shader: {fileID: 4800000, guid: 37cf7523fc5cc50448bf0e0b4f22b804, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _SkyCube:
+        m_Texture: {fileID: 8900000, guid: 095b29c444e384f4c9b08812d6258b71, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SkyCubeA:
+        m_Texture: {fileID: 8900000, guid: 5734983fc81450b4187c3cfa5985edef, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SkyCubeB:
+        m_Texture: {fileID: 8900000, guid: 5734983fc81450b4187c3cfa5985edef, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _ExposureA: 1
+    - _ExposureB: 1
+    - _GradientStrength: 0
+    - _GradientStrengthA: 0.3
+    - _GradientStrengthB: 0.3
+    - _RotationA: 0
+    - _RotationB: 0
+    - _SkyExposure: 1
+    m_Colors:
+    - _HorizonBaseColor: {r: 0.41509432, g: 0.23300105, b: 0.23300105, a: 1}
+    - _HorizonBaseColorA: {r: 0.6, g: 0.5, b: 0.5, a: 1}
+    - _HorizonBaseColorB: {r: 0.1, g: 0.1, b: 0.2, a: 1}
+    - _SkyTint: {r: 1, g: 1, b: 1, a: 1}
+    - _TintA: {r: 1, g: 1, b: 1, a: 1}
+    - _TintB: {r: 1, g: 1, b: 1, a: 1}
+    - _ZenithColor: {r: 0.24563903, g: 0.2963797, b: 0.4528302, a: 1}
+    - _ZenithColorA: {r: 0.1, g: 0.15, b: 0.3, a: 1}
+    - _ZenithColorB: {r: 0, g: 0, b: 0.05, a: 1}
+  m_BuildTextureStacks: []

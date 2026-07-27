@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Custom_SceneLitFogged 1
+  m_Shader: {fileID: 4800000, guid: abcd272d14ed22e4e87df3c581de73c6, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FOG_AFFECTS
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DissolveNoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Cull: 2
+    - _DissolveAmount: 0
+    - _DissolveAxisCenter: 0
+    - _DissolveBrightnessPower: 2
+    - _DissolveEdgeIntensity: 3
+    - _DissolveEdgeWidth: 0.1
+    - _DissolveMode: 0
+    - _DissolveNoiseScale: 2
+    - _DissolveRadialReverse: 0
+    - _DissolveSpace: 1
+    - _DissolveUseNoiseTex: 0
+    - _FogEnable: 1
+    - _FresnelBias: 0.22
+    - _FresnelIntensity: 3.89
+    - _FresnelPower: 6.7
+    - _Metallic: 0.492
+    - _NormalScale: 1
+    - _ReflectionIntensity: 0.2
+    - _Smoothness: 0.688
+    - _UseMaps: 0
+    - _UseNormal: 0
+    m_Colors:
+    - _BaseColor: {r: 0.5283019, g: 0.5283019, b: 0.5283019, a: 1}
+    - _DissolveAxis: {r: 0, g: 1, b: 0, a: 1}
+    - _DissolveEdgeColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+    - _DissolveRadial: {r: 0, g: 0, b: 0, a: 1}
+    - _EmissionColor: {r: 0.09433961, g: 0.073276356, b: 0.073276356, a: 1}
+    - _FresnelColor: {r: 0.72955966, g: 0.43652222, b: 0.20877323, a: 1}
+    - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+  m_BuildTextureStacks: []
