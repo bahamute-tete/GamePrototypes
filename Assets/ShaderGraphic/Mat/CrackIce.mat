@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  version: 5
+  version: 7
 --- !u!21 &2100000
 Material:
   serializedVersion: 8
@@ -23,6 +23,8 @@ Material:
   m_Name: CrackIce
   m_Shader: {fileID: -6465566751694194690, guid: 49b4260ee9fa11a47ba788c030176e4e,
     type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 2
@@ -31,6 +33,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -42,11 +45,23 @@ Material:
         m_Texture: {fileID: 2800000, guid: 8c22bbbebdc333a4897dfa586be0f323, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_b0491e490fe645c2a75f3aacb31d4f52_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 8c22bbbebdc333a4897dfa586be0f323, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_b68059e7c5924a06a2a5eb87daaf4939_Texture_1:
         m_Texture: {fileID: 2800000, guid: 9c2add57e03e6044786b1b467492036f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_b68059e7c5924a06a2a5eb87daaf4939_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 9c2add57e03e6044786b1b467492036f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_c483781ca7924b65abe91bb556770fd6_Texture_1:
+        m_Texture: {fileID: 2800000, guid: 58c8d60e469c5d54db6fd04c4add163c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_c483781ca7924b65abe91bb556770fd6_Texture_1_Texture2D:
         m_Texture: {fileID: 2800000, guid: 58c8d60e469c5d54db6fd04c4add163c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}

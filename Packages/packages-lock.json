@@ -11,11 +11,12 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.burst": {
-      "version": "1.7.3",
+      "version": "1.8.18",
       "depth": 1,
       "source": "registry",
       "dependencies": {
-        "com.unity.mathematics": "1.2.1"
+        "com.unity.mathematics": "1.2.1",
+        "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.cn"
     },
@@ -110,14 +111,14 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.nuget.mono-cecil": {
-      "version": "1.10.1",
+      "version": "1.11.4",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.cn"
     },
     "com.unity.nuget.newtonsoft-json": {
-      "version": "3.0.2",
+      "version": "3.2.1",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
@@ -131,12 +132,13 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.render-pipelines.core": {
-      "version": "12.1.7",
+      "version": "14.0.11",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
         "com.unity.ugui": "1.0.0",
         "com.unity.modules.physics": "1.0.0",
+        "com.unity.modules.terrain": "1.0.0",
         "com.unity.modules.jsonserialize": "1.0.0"
       }
     },
@@ -146,40 +148,49 @@
       "source": "builtin",
       "dependencies": {
         "com.unity.mathematics": "1.2.1",
-        "com.unity.burst": "1.7.3",
-        "com.unity.render-pipelines.core": "12.1.7",
-        "com.unity.shadergraph": "12.1.7"
+        "com.unity.burst": "1.8.9",
+        "com.unity.render-pipelines.core": "14.0.11",
+        "com.unity.shadergraph": "14.0.11",
+        "com.unity.render-pipelines.universal-config": "14.0.9"
+      }
+    },
+    "com.unity.render-pipelines.universal-config": {
+      "version": "14.0.10",
+      "depth": 1,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.render-pipelines.core": "14.0.10"
       }
     },
     "com.unity.searcher": {
-      "version": "4.9.1",
+      "version": "4.9.2",
       "depth": 2,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.cn"
     },
     "com.unity.services.core": {
-      "version": "1.5.2",
+      "version": "1.14.0",
       "depth": 1,
       "source": "registry",
       "dependencies": {
-        "com.unity.modules.unitywebrequest": "1.0.0",
-        "com.unity.nuget.newtonsoft-json": "3.0.2",
-        "com.unity.modules.androidjni": "1.0.0"
+        "com.unity.modules.androidjni": "1.0.0",
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.modules.unitywebrequest": "1.0.0"
       },
       "url": "https://packages.unity.cn"
     },
     "com.unity.shadergraph": {
-      "version": "12.1.7",
+      "version": "14.0.11",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
-        "com.unity.render-pipelines.core": "12.1.7",
-        "com.unity.searcher": "4.9.1"
+        "com.unity.render-pipelines.core": "14.0.11",
+        "com.unity.searcher": "4.9.2"
       }
     },
     "com.unity.terrain-tools": {
-      "version": "4.0.5",
+      "version": "5.0.6",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -230,7 +241,7 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.transport": {
-      "version": "1.2.0",
+      "version": "1.5.0",
       "depth": 1,
       "source": "registry",
       "dependencies": {
@@ -254,8 +265,8 @@
       "depth": 0,
       "source": "builtin",
       "dependencies": {
-        "com.unity.shadergraph": "12.1.7",
-        "com.unity.render-pipelines.core": "12.1.7"
+        "com.unity.shadergraph": "14.0.11",
+        "com.unity.render-pipelines.core": "14.0.11"
       }
     },
     "com.unity.visualscripting": {
@@ -399,17 +410,6 @@
     "com.unity.modules.uielements": {
       "version": "1.0.0",
       "depth": 0,
-      "source": "builtin",
-      "dependencies": {
-        "com.unity.modules.ui": "1.0.0",
-        "com.unity.modules.imgui": "1.0.0",
-        "com.unity.modules.jsonserialize": "1.0.0",
-        "com.unity.modules.uielementsnative": "1.0.0"
-      }
-    },
-    "com.unity.modules.uielementsnative": {
-      "version": "1.0.0",
-      "depth": 1,
       "source": "builtin",
       "dependencies": {
         "com.unity.modules.ui": "1.0.0",
