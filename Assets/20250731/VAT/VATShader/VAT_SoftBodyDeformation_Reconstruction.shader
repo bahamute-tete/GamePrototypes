@@ -1,4 +1,4 @@
-Shader "SideFX/VAT_SoftBodyDeformation"
+Shader "SideFX/VAT_SoftBodyDeformation_Reconstruction"
 {
     Properties
     {
@@ -85,6 +85,8 @@ Shader "SideFX/VAT_SoftBodyDeformation"
             float _boundMinZ;
         CBUFFER_END
 
+        StructuredBuffer<float> _gameTimeAtFirstFrameBuffer;
+
         TEXTURE2D(_posTexture);
         SAMPLER(sampler_posTexture);
         TEXTURE2D(_posTexture2);
@@ -141,7 +143,11 @@ Shader "SideFX/VAT_SoftBodyDeformation"
             float playbackFrameCount = max(1.0, frameCount - firstFrameIndex);
 
 
-            float elapsedTime = _TimeParameters.x - _gameTimeAtFirstFrame;
+            #if defined(UNITY_INSTANCING_ENABLED) || defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
+                float elapsedTime = _TimeParameters.x - _gameTimeAtFirstFrameBuffer[unity_InstanceID];
+            #else
+                float elapsedTime = _TimeParameters.x - _gameTimeAtFirstFrame;
+            #endif
             // float animationFrame = frac(
             //     elapsedTime * (_houdiniFPS / max(frameCount - 0.01, 0.01)) * _playbackSpeed
             // ) * frameCount;

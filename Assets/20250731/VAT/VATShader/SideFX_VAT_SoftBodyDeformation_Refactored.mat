@@ -7,15 +7,15 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: SideFX_VAT_SoftBodyDeformation
-  m_Shader: {fileID: 4800000, guid: fc4912f0724c8a94bb8a0eea03ce71b8, type: 3}
+  m_Name: SideFX_VAT_SoftBodyDeformation_Refactored
+  m_Shader: {fileID: 4800000, guid: 92abbd9f745f8174a858a92ff645b1d9, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _B_LOAD_COL_TEX
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -24,20 +24,16 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _SampleTexture2D_72ab43ee7e5b4ff3acd5a9fb57f150dc_Texture_1_Texture2D:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _SurfaceNormalMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _colTexture:
-        m_Texture: {fileID: 2800000, guid: ac8825eddad396e43acb7662e7b1e1f5, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _posTexture:
-        m_Texture: {fileID: 2800000, guid: 0632c243ea9d7bf4285f0759014cfcee, type: 3}
+        m_Texture: {fileID: 2800000, guid: e689489e34d66904585141c9c824eb3a, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _posTexture2:
@@ -45,22 +41,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _rotTexture:
-        m_Texture: {fileID: 2800000, guid: 304a58cd08136db43ac6dfa0b1756363, type: 3}
+        m_Texture: {fileID: 2800000, guid: e755859e8e7f098439ee4db1d5f6eefb, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _spareColTexture:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_Lightmaps:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_LightmapsInd:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_ShadowMasks:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -77,7 +61,7 @@ Material:
     - _B_surfaceNormals: 0
     - _B_twoSidedNorms: 0
     - _PlaybackStartFrame: 2
-    - _QueueControl: 0
+    - _QueueControl: -1
     - _QueueOffset: 0
     - _boundMaxX: 1
     - _boundMaxY: 1.9
