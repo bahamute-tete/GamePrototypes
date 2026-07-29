@@ -74,10 +74,18 @@ VATFrameData VAT_GetFrameData(
     );
     float playbackFrameCount = max(1.0, frameCount - firstFrameIndex);
     
-#if defined(UNITY_INSTANCING_ENABLED) || defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
-                float elapsedTime = _TimeParameters.x - _gameTimeAtFirstFrameBuffer[unity_InstanceID];
+    // Use the explicit currentTime argument instead of the VFX-only _TimeParameters
+    // global so the same function compiles in regular Shader Graph materials and in
+    // VFX Graph contexts (wire a Time node into the Time input).
+    //
+    // The per-instance game-time buffer path is opt-in: it only compiles when the
+    // including shader defines VAT_GAME_TIME_PER_INSTANCE before including this
+    // file (see VAT_SoftBodyDeformation_Reuse.shader). Shader Graph generated code
+    // never defines it, which keeps GPU-instanced material variants compiling.
+#if defined(VAT_GAME_TIME_PER_INSTANCE) && (defined(UNITY_INSTANCING_ENABLED) || defined(UNITY_PROCEDURAL_INSTANCING_ENABLED))
+    float elapsedTime = currentTime - _gameTimeAtFirstFrameBuffer[unity_InstanceID];
 #else
-    float elapsedTime = _TimeParameters.x - _gameTimeAtFirstFrame;
+    float elapsedTime = currentTime - gameTimeAtFirstFrame;
 #endif
     
     float animationFrame = frac(

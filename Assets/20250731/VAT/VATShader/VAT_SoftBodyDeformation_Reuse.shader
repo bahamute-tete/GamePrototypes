@@ -98,6 +98,9 @@ Shader "SideFX/VAT_SoftBodyDeformation_Reuse"
         TEXTURE2D(_SurfaceNormalMap);
         SAMPLER(sampler_SurfaceNormalMap);
 
+        // Opt in to the per-instance game-time buffer path inside the shared file.
+        #define VAT_GAME_TIME_PER_INSTANCE
+
         #include "VAT_SoftBodyDeformation_Shared.hlsl"
 
         #if defined(_B_LOAD_POS_TWO_TEX)
@@ -132,7 +135,7 @@ Shader "SideFX/VAT_SoftBodyDeformation_Reuse"
         {
             return VAT_GetFrameData(
                 vatUV,
-                _TimeParameters.x,
+                _Time.y,
                 _B_autoPlayback,
                 _gameTimeAtFirstFrame,
                 _PlaybackStartFrame,

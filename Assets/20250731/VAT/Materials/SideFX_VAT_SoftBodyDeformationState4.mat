@@ -37,7 +37,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _posTexture:
-        m_Texture: {fileID: 2800000, guid: 0632c243ea9d7bf4285f0759014cfcee, type: 3}
+        m_Texture: {fileID: 2800000, guid: 7c4dc2364a1e70a4a80d4be4c032b352, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _posTexture2:
@@ -45,7 +45,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _rotTexture:
-        m_Texture: {fileID: 2800000, guid: 304a58cd08136db43ac6dfa0b1756363, type: 3}
+        m_Texture: {fileID: 2800000, guid: 46be85b8af372054cb573dc0d6692591, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _spareColTexture:
@@ -84,9 +84,9 @@ Material:
     - _boundMaxZ: 0.65
     - _boundMinX: -1
     - _boundMinY: -0.128
-    - _boundMinZ: -0.3
+    - _boundMinZ: -0.6
     - _displayFrame: 2
-    - _frameCount: 120
+    - _frameCount: 10
     - _gameTimeAtFirstFrame: 0
     - _houdiniFPS: 30
     - _playbackSpeed: 1
