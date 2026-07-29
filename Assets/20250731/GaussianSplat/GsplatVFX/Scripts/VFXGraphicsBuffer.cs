@@ -28,6 +28,7 @@ public class VFXGraphicsBuffer : MonoBehaviour
     public Camera targetCamera;
 
     [Header("音频驱动 (可选)")]
+    [HideInInspector]
     public bool useAudioSpectrum = false;
 
     // ======================================================================

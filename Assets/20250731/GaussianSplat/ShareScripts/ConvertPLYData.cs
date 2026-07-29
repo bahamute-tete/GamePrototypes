@@ -332,7 +332,7 @@ public class ConvertPLYData : MonoBehaviour
 
         }
 
-        if (Directory.Exists(outputFolder))
+        if (!Directory.Exists(outputFolder))
         { 
             Directory.CreateDirectory(outputFolder);
         }

@@ -1,0 +1,341 @@
+// =============================================================================
+// 3D Gaussian Splatting · Compute Shader (无球谐版本，仅 DC 颜色)
+// =============================================================================
+// 渲染管线（每个高斯每帧执行一次）：
+//
+//   1. 构造世界空间 3D 协方差：  Σ_world = M · M^T,  M = R · S
+//      (R 由四元数构造的旋转, S 为对角的 scale; 用 R·S 一步出列向量可省 2 次矩阵乘)
+//   2. 旋转到观察空间：          Σ_view  = W · Σ_world · W^T   (W = view matrix 的 3x3 旋转部分)
+//   3. 在 splat 的 view 空间中心处求透视投影的雅可比 J
+//   4. 投影到屏幕像素空间：       Σ_screen = J · Σ_view · J^T + AA·I   (低通滤波，防小高斯闪烁)
+//   5. 对 2x2 Σ_screen 做特征分解 → 椭圆的主/副半轴 + 旋转角度
+//   6. 像素半径换算回世界半径，写入输出 buffer 给 VFX Graph 用
+//
+// 输出 buffer 元素布局（float4 / splat）：
+//   .x = 沿主轴的世界空间"半轴"长度（已乘 SIZE_CUTOFF_SIGMAS）
+//   .y = 沿副轴的世界空间"半轴"长度（同上）
+//   .z = 椭圆旋转角度（弧度，屏幕 Y-up 下逆时针为正）
+//   .w = 备用 / 当前未使用（被剔除则整个 float4 = 0，等价于 size = 0 不可见）
+//
+// VFX Graph 端的尺寸协议：
+//   Set Size = 2 （输出是"半轴"，× 2 才是 quad 边长）
+//   Multiply Scale.XYZ = (output.x, output.y, 1)
+//   Set Angle.Z       = Radians-to-Degrees(output.z)
+// =============================================================================
+
+#pragma kernel ComputeSplatTransform
+#pragma kernel CalcViewDepth
+#pragma kernel BitonicSort
+#pragma kernel CopySortedIndices
+
+// -----------------------------------------------------------------------------
+// 可调常量
+// -----------------------------------------------------------------------------
+// 高斯从中心到 quad 边界对应的 σ 倍数。3.0 对应 ~99.7% 能量截断，
+// 也和 Shader Graph 中 exp(-(6·(uv-0.5))²) 在 uv 边缘 r=3 的设定一致。
+#define SIZE_CUTOFF_SIGMAS  3.0
+
+// 屏幕空间各向同性低通项。给 Σ_screen 加 0.3·I 后，最小投影半径约为 √0.3 ≈ 0.55 px，
+// 避免亚像素 splat 闪烁/消失。INRIA / Mip-Splatting 的标准取值。
+#define SCREEN_AA_FILTER    0.3
+
+// 小特征值 λ₂ 的像素级下限（单位：px²）。
+// 只防止过小/负特征值导致的数值问题（sqrt 出 NaN、尺寸为 0），
+// 不再按长宽比整体加粗细长 splat（gsplat-unity 插件同款做法）。
+#define MIN_LAMBDA2_PX2   0.1
+
+// -----------------------------------------------------------------------------
+// 静态输入 Buffer（初始化时一次性填充，后续不变）
+// -----------------------------------------------------------------------------
+StructuredBuffer<float3> _PositionBuffer;   // 世界空间位置
+StructuredBuffer<float3> _ScaleBuffer;      // 局部坐标系下三个主轴 σ（C# 端已做 exp）
+StructuredBuffer<float4> _RotationBuffer;   // 四元数 (x, y, z, w)，Unity 约定
+
+// 每帧写出
+RWStructuredBuffer<float4> _OutputTransformBuffer;
+
+// -----------------------------------------------------------------------------
+// 每帧 Uniform
+// -----------------------------------------------------------------------------
+float4x4 _ViewMatrix;        // camera.worldToCameraMatrix
+float4x4 _ProjectionMatrix;  // GL.GetGPUProjectionMatrix(camera.projectionMatrix, false)
+float2   _ScreenSize;        // (pixelWidth, pixelHeight)
+float    _NearPlane;         // camera.nearClipPlane —— 用于背后剔除
+int      _Count;             // splat 总数
+
+
+// =============================================================================
+// 3D 协方差： Σ = R · S · S^T · R^T = (R·S) · (R·S)^T
+//
+// S 是对角矩阵，所以 R·S 的列就等于 R 的列乘以对应的 scale 分量。
+// 在 row-major HLSL 中，row * scale 就是逐分量乘，结果是 (R·S) 的对应行。
+// 这样一次矩阵乘就能搞定，比 R·S·S^T·R^T 四连乘少 2 次 3x3 乘法。
+// =============================================================================
+float3x3 ComputeCovariance3D(float3 scale, float4 q)
+{
+    float x = q.x, y = q.y, z = q.z, w = q.w;
+
+    // 四元数 → 旋转矩阵（列向量约定）
+    float3x3 R = float3x3(
+        1.0 - 2.0*(y*y + z*z),   2.0*(x*y - w*z),         2.0*(x*z + w*y),
+        2.0*(x*y + w*z),         1.0 - 2.0*(x*x + z*z),   2.0*(y*z - w*x),
+        2.0*(x*z - w*y),         2.0*(y*z + w*x),         1.0 - 2.0*(x*x + y*y)
+    );
+
+    // M = R · S ，按行展开（每行 × scale）
+    float3x3 M = float3x3(
+        R[0] * scale,
+        R[1] * scale,
+        R[2] * scale
+    );
+
+    return mul(M, transpose(M));
+}
+
+
+// =============================================================================
+// 透视投影的雅可比（view space → 像素空间的局部线性近似）
+//
+// 投影公式：  NDC.x   = fx · view.x / depth,  depth = -view.z
+//             pixel.x = (NDC.x · 0.5 + 0.5) · screenW
+//
+// 对 view 空间分量取偏导，得到 2x3 的 J：
+//   ∂pixel.x/∂view = ( fx·hW/depth,   0,   -fx·hW·view.x/depth² )
+//   ∂pixel.y/∂view = ( 0,   fy·hH/depth,   -fy·hH·view.y/depth² )
+//
+// 为防止 splat 接近视锥边缘时投影非线性误差过大（视觉上表现为拉成长条），
+// 把用于线性化的点 t.xy 限制在 1.3 倍视锥范围内（INRIA 原版做法）。
+// =============================================================================
+float2x3 ComputeProjectionJacobian(float3 t, float fx, float fy, float2 screenSize)
+{
+    float z = max(-t.z, 0.001);   // 防 0
+
+    float limX = 1.3 * z / fx;
+    float limY = 1.3 * z / fy;
+    t.x = clamp(t.x, -limX, limX);
+    t.y = clamp(t.y, -limY, limY);
+
+    float invZ  = 1.0 / z;
+    float invZ2 = invZ * invZ;
+
+    float halfW = 0.5 * screenSize.x;
+    float halfH = 0.5 * screenSize.y;
+
+    return float2x3(
+        fx * halfW * invZ,   0.0,                 -fx * halfW * t.x * invZ2,
+        0.0,                 fy * halfH * invZ,   -fy * halfH * t.y * invZ2
+    );
+}
+
+
+// =============================================================================
+// 把 3D 协方差投影到屏幕：  Σ_screen = J · W · Σ_world · W^T · J^T + AA·I
+// =============================================================================
+float2x2 ProjectCovarianceToScreen(float3x3 sigmaWorld, float3 viewPos,
+                                   float fx, float fy, float2 screenSize)
+{
+    float3x3 W = (float3x3)_ViewMatrix;            // view matrix 的纯旋转部分
+    float3x3 sigmaView = mul(mul(W, sigmaWorld), transpose(W));
+
+    float2x3 J = ComputeProjectionJacobian(viewPos, fx, fy, screenSize);
+    float2x2 sigmaScreen = mul(mul(J, sigmaView), transpose(J));
+
+    // 各向同性低通：保证最小投影尺寸 ≈ 0.55 px，防止亚像素 splat 闪烁
+    sigmaScreen[0][0] += SCREEN_AA_FILTER;
+    sigmaScreen[1][1] += SCREEN_AA_FILTER;
+
+    return sigmaScreen;
+}
+
+
+// =============================================================================
+// 2x2 实对称矩阵特征分解
+//   输入：  Σ = (a, b; b, d)
+//   输出：  lambda = (λ_大, λ_小),
+//          U = [v1 | v2]，列为单位特征向量，det(U) = +1（标准旋转矩阵形式）
+// =============================================================================
+void EigenDecomposeSymmetric2x2(float2x2 cov, out float2 lambda, out float2x2 U)
+{
+    float a = cov[0][0];
+    float b = cov[0][1];
+    float d = cov[1][1];
+
+    float trace = a + d;
+    float det   = a * d - b * b;
+    float disc  = sqrt(max(0.0, 0.25 * trace * trace - det));
+
+    lambda.x = 0.5 * trace + disc;   // 大特征值
+    lambda.y = 0.5 * trace - disc;   // 小特征值
+
+    if (abs(b) > 1e-5)
+    {
+        // v1 取与 (b, λ_大 - a) 同向的单位向量；v2 是其逆时针 90° 旋转
+        float2 v1 = normalize(float2(b, lambda.x - a));
+        float2 v2 = float2(-v1.y, v1.x);
+        U = float2x2(v1.x, v2.x,
+                     v1.y, v2.y);
+    }
+    else
+    {
+        // 已经对角：按特征值大小决定轴顺序
+        if (a >= d) U = float2x2(1, 0,  0, 1);
+        else        U = float2x2(0, 1,  1, 0);
+    }
+}
+
+
+// =============================================================================
+// 备用工具函数（目前未在主路径调用，保留供后续扩展）
+// =============================================================================
+
+// 仅返回特征值的对角矩阵（无特征向量）
+float2x2 EigenValuesOnly2x2(float2x2 A)
+{
+    float trace = A[0][0] + A[1][1];
+    float det   = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+    float disc  = sqrt(max(0.0, 0.25 * trace * trace - det));
+    return float2x2(0.5 * trace + disc, 0,
+                    0,                  0.5 * trace - disc);
+}
+
+// 把单位圆映射到投影椭圆的 2x2 变换矩阵 M = U · diag(σ_x, σ_y)
+// 如果未来想直接把 unit quad 通过 M 变换（替代 size + angle 的二段式），可以用它
+float2x2 BuildEllipseTransform(float2 lambda, float2x2 U)
+{
+    float2 stddev = sqrt(max(lambda, 1e-5));
+    float2x2 S = float2x2(stddev.x, 0,
+                          0,        stddev.y);
+    return mul(U, S);
+}
+
+
+// =============================================================================
+// 主 kernel：把每个 splat 的 (size_x, size_y, angle) 写入输出 buffer
+// =============================================================================
+[numthreads(64, 1, 1)]
+void ComputeSplatTransform(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= (uint)_Count) return;
+
+    // ---- 静态数据 ----
+    float3 worldPos = _PositionBuffer[idx];
+    float3 scale    = _ScaleBuffer[idx];
+    float4 rot      = _RotationBuffer[idx];
+
+    // ---- 近平面剔除 ----
+    // Unity view space 中前方对应 view.z < 0；只保留 view.z < -nearPlane 的点
+    float3 viewPos = mul(_ViewMatrix, float4(worldPos, 1.0)).xyz;
+    if (viewPos.z > -_NearPlane)
+    {
+        _OutputTransformBuffer[idx] = float4(0, 0, 0, 0);   // size = 0 → VFX 渲为不可见
+        return;
+    }
+
+    // ---- 焦距（Unity 透视：_m00 = cot(fov_h/2), _m11 = cot(fov_v/2)）----
+    float fx = _ProjectionMatrix._m00;
+    float fy = _ProjectionMatrix._m11;
+
+    // ---- 3D → 2D 屏幕协方差 ----
+    float3x3 sigmaWorld  = ComputeCovariance3D(scale, rot);
+    float2x2 sigmaScreen = ProjectCovarianceToScreen(sigmaWorld, viewPos, fx, fy, _ScreenSize);
+
+    // ---- 特征分解 ----
+    float2 lambda;
+    float2x2 U;
+    EigenDecomposeSymmetric2x2(sigmaScreen, lambda, U);
+
+    // ---- 小特征值下限 ----
+    // 只把 λ_小 垫到 0.1 px²（约 0.32 px 标准差），防止 sqrt(≤0) 出 NaN、
+    // 或退化 splat 尺寸为 0；不再按长宽比强制加粗，保留细长 splat 的真实形状。
+    // 注意：lambda.x 是大特征值，lambda.y 是小特征值（EigenDecompose 内部保证）
+    lambda.y = max(lambda.y, MIN_LAMBDA2_PX2);
+
+    // sqrt(λ) = 该方向上的标准差（像素）
+    float2 sigmaPixels = sqrt(max(lambda, 1e-5));
+
+    // ---- 像素 → 世界单位换算 ----
+    // 由透视投影反推：1 像素 在 depth 处 ≈ (2·depth) / (fy · screenH) 世界单位
+    // （fy·screenH 和 fx·screenW 在 Unity 投影矩阵下相等，所以 X/Y 用同一个系数）
+    float depth = -viewPos.z;
+    float pixelToWorld = (2.0 * depth) / (fy * _ScreenSize.y);
+
+    // 输出 "σ × cutoff" 的世界尺寸（半轴长度）；VFX 端 Set Size = 2 即得完整边长
+    float2 halfSizeWorld = sigmaPixels * pixelToWorld * SIZE_CUTOFF_SIGMAS;
+
+    // ---- 旋转角度 ----
+    // U = [cosθ -sinθ; sinθ cosθ]  →  θ = atan2(U[1][0], U[0][0])
+    float angle = atan2(U[1][0], U[0][0]);
+
+    _OutputTransformBuffer[idx] = float4(halfSizeWorld.x, halfSizeWorld.y, angle, 0);
+}
+
+
+// =============================================================================
+// 排序相关 kernel（深度计算 + Bitonic Sort）
+// VFX Graph 端如需 back-to-front 透明排序，从 _OrderBuffer 取索引即可。
+// 注：当前主路径未启用排序；如要启用，需在 C# 端额外创建 _SortBuffer/_OrderBuffer
+//     并按层级反复 dispatch BitonicSort。
+// =============================================================================
+struct SortData
+{
+    float depth;
+    uint  index;
+};
+
+RWStructuredBuffer<SortData> _SortBuffer;
+RWStructuredBuffer<uint>     _OrderBuffer;
+int _SortLevel;
+int _SortMask;
+
+// 每个 splat 的 view 空间 Z（前方为负）。升序排序后远的在前。
+[numthreads(256, 1, 1)]
+void CalcViewDepth(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+
+    if (idx >= (uint)_Count)
+    {
+        // 超出有效范围的尾部填充：给一个大正数，保证排序到最后
+        _SortBuffer[idx].depth = 1e9;
+        _SortBuffer[idx].index = 0;
+        return;
+    }
+
+    float3 viewPos = mul(_ViewMatrix, float4(_PositionBuffer[idx], 1.0)).xyz;
+    _SortBuffer[idx].depth = viewPos.z;     // 负数 = 在相机前方
+    _SortBuffer[idx].index = idx;
+}
+
+// Bitonic Sort 单步。外部按层级反复 dispatch。
+[numthreads(256, 1, 1)]
+void BitonicSort(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    uint j = i ^ _SortLevel;
+
+    if (j > i)   // 每对只由小索引线程处理，避免重复
+    {
+        bool ascending = (i & _SortMask) == 0;
+
+        float di = _SortBuffer[i].depth;
+        float dj = _SortBuffer[j].depth;
+
+        bool swap = (ascending && di > dj) || (!ascending && di < dj);
+        if (swap)
+        {
+            SortData tmp = _SortBuffer[i];
+            _SortBuffer[i] = _SortBuffer[j];
+            _SortBuffer[j] = tmp;
+        }
+    }
+}
+
+// 排序完成后提取索引列表给下游使用
+[numthreads(256, 1, 1)]
+void CopySortedIndices(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= (uint)_Count) return;
+    _OrderBuffer[idx] = _SortBuffer[idx].index;
+}

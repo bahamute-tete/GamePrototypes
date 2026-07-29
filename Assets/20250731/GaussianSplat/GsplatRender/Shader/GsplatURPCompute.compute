@@ -1,0 +1,295 @@
+// =============================================================================
+// 3D Gaussian Splatting · URP 渲染用 Compute Shader（无球谐版本，仅 DC 颜色）
+// =============================================================================
+// 与 GsplatVFX/Shader/GaussianSplatting.compute 的区别：
+//   VFX 版输出「世界空间半轴 + 角度」，是给 VFX Graph 的协议；
+//   本版本输出「clip 空间中心 + NDC 空间椭圆轴」，给 URP shader 用
+//   Graphics.DrawProceduralIndirect 画屏幕空间 quad。
+//
+// 每帧流程：
+//   1. ComputeSplatScreen: 3D 协方差 → 投影到屏幕 → 特征分解 → 写 clip 中心 + NDC 轴
+//   2. CalcViewDepth + BitonicSort + CopySortedIndices: 按 view 深度 back-to-front 排序
+//
+// 输出 Buffer 协议（给 GaussianSplatURP.shader）：
+//   _SplatClipPos[idx]  = float4(clipX, clipY, clipZ, clipW)   splat 中心的 clip 坐标
+//   _SplatAxis[idx]     = float4(axis1.xy, axis2.xy)           NDC 空间椭圆两主轴（σ 单位）
+//   _SplatOrder[i]      = 第 i 个绘制（从远到近）的 splat 索引
+//   被剔除的 splat 轴写 0 → quad 退化为零面积，不产生任何片元
+// =============================================================================
+
+#pragma kernel ComputeSplatScreen
+#pragma kernel CalcViewDepth
+#pragma kernel BitonicSort
+#pragma kernel CopySortedIndices
+
+// -----------------------------------------------------------------------------
+// 可调常量
+// -----------------------------------------------------------------------------
+// 高斯从中心到 quad 边界对应的 σ 倍数。3.0 ≈ 98.9% 能量截断（二维），
+// 与 shader 端 exp(-0.5 * r²) 在 r=3 处衰减到 ~1.1% 一致。
+#define SIZE_CUTOFF_SIGMAS  3.0
+
+// 屏幕空间各向同性低通项（px²）。给 Σ_screen 加 0.3·I 后最小投影半径约 0.55px，
+// 避免亚像素 splat 闪烁/消失。INRIA / Mip-Splatting 标准取值。
+#define SCREEN_AA_FILTER    0.3
+
+// 小特征值 λ₂ 下限（px²），防 sqrt(≤0) 出 NaN、退化 splat 尺寸为 0。
+#define MIN_LAMBDA2_PX2     0.1
+
+// -----------------------------------------------------------------------------
+// 静态输入 Buffer（初始化时一次性填充）
+// -----------------------------------------------------------------------------
+StructuredBuffer<float3> _PositionBuffer;   // 位置（splat 局部空间，由渲染脚本的 Transform 转到世界）
+StructuredBuffer<float3> _ScaleBuffer;      // 三个主轴 σ（如对数尺度请先在 C# 端 exp）
+StructuredBuffer<float4> _RotationBuffer;   // 四元数 (x, y, z, w)，Unity 约定
+
+// -----------------------------------------------------------------------------
+// 每帧输出 Buffer（给渲染 shader）
+// -----------------------------------------------------------------------------
+RWStructuredBuffer<float4> _SplatClipPos;   // clip 空间中心
+RWStructuredBuffer<float4> _SplatAxis;      // NDC 椭圆轴: xy=主轴(σ), zw=副轴(σ)
+
+// -----------------------------------------------------------------------------
+// 每帧 Uniform
+// -----------------------------------------------------------------------------
+float4x4 _LocalToWorldMatrix;  // splat 数据的 GameObject 变换
+float4x4 _ViewMatrix;          // camera.worldToCameraMatrix
+float4x4 _ProjectionMatrix;    // GL.GetGPUProjectionMatrix(camera.projectionMatrix, false)
+float2   _ScreenSize;          // (pixelWidth, pixelHeight)
+float    _NearPlane;           // camera.nearClipPlane
+int      _Count;               // splat 总数
+
+
+// =============================================================================
+// 3D 协方差： Σ = R · S · S^T · R^T = (R·S) · (R·S)^T
+// S 是对角矩阵，R·S 的行就是 R 的行逐分量乘 scale，一次搞定。
+// =============================================================================
+float3x3 ComputeCovariance3D(float3 scale, float4 q)
+{
+    q = normalize(q);   // 防资产数据未归一化
+    float x = q.x, y = q.y, z = q.z, w = q.w;
+
+    float3x3 R = float3x3(
+        1.0 - 2.0*(y*y + z*z),   2.0*(x*y - w*z),         2.0*(x*z + w*y),
+        2.0*(x*y + w*z),         1.0 - 2.0*(x*x + z*z),   2.0*(y*z - w*x),
+        2.0*(x*z - w*y),         2.0*(y*z + w*x),         1.0 - 2.0*(x*x + y*y)
+    );
+
+    float3x3 M = float3x3(
+        R[0] * scale,
+        R[1] * scale,
+        R[2] * scale
+    );
+
+    return mul(M, transpose(M));
+}
+
+
+// =============================================================================
+// 透视投影雅可比（view space → 像素空间的局部线性近似）
+// 把线性化中心 t.xy 限制在 1.3 倍视锥内，防视锥边缘拉成长条（INRIA 原版做法）。
+// =============================================================================
+float2x3 ComputeProjectionJacobian(float3 t, float fx, float fy, float2 screenSize)
+{
+    float z = max(-t.z, 0.001);
+
+    float limX = 1.3 * z / fx;
+    float limY = 1.3 * z / fy;
+    t.x = clamp(t.x, -limX, limX);
+    t.y = clamp(t.y, -limY, limY);
+
+    float invZ  = 1.0 / z;
+    float invZ2 = invZ * invZ;
+
+    float halfW = 0.5 * screenSize.x;
+    float halfH = 0.5 * screenSize.y;
+
+    return float2x3(
+        fx * halfW * invZ,   0.0,                 -fx * halfW * t.x * invZ2,
+        0.0,                 fy * halfH * invZ,   -fy * halfH * t.y * invZ2
+    );
+}
+
+
+// =============================================================================
+// 3D 协方差 → 屏幕 2D 协方差： Σ_screen = J · W · Σ_world · W^T · J^T + AA·I
+// =============================================================================
+float2x2 ProjectCovarianceToScreen(float3x3 sigmaWorld, float3 viewPos,
+                                   float fx, float fy, float2 screenSize)
+{
+    float3x3 W = (float3x3)_ViewMatrix;
+    float3x3 sigmaView = mul(mul(W, sigmaWorld), transpose(W));
+
+    float2x3 J = ComputeProjectionJacobian(viewPos, fx, fy, screenSize);
+    float2x2 sigmaScreen = mul(mul(J, sigmaView), transpose(J));
+
+    sigmaScreen[0][0] += SCREEN_AA_FILTER;
+    sigmaScreen[1][1] += SCREEN_AA_FILTER;
+
+    return sigmaScreen;
+}
+
+
+// =============================================================================
+// 2x2 实对称矩阵特征分解
+//   输出： lambda = (λ_大, λ_小)，U 的列为单位特征向量，det(U) = +1
+// =============================================================================
+void EigenDecomposeSymmetric2x2(float2x2 cov, out float2 lambda, out float2x2 U)
+{
+    float a = cov[0][0];
+    float b = cov[0][1];
+    float d = cov[1][1];
+
+    float trace = a + d;
+    float det   = a * d - b * b;
+    float disc  = sqrt(max(0.0, 0.25 * trace * trace - det));
+
+    lambda.x = 0.5 * trace + disc;
+    lambda.y = 0.5 * trace - disc;
+
+    if (abs(b) > 1e-5)
+    {
+        float2 v1 = normalize(float2(b, lambda.x - a));
+        float2 v2 = float2(-v1.y, v1.x);
+        U = float2x2(v1.x, v2.x,
+                     v1.y, v2.y);
+    }
+    else
+    {
+        if (a >= d) U = float2x2(1, 0,  0, 1);
+        else        U = float2x2(0, 1,  1, 0);
+    }
+}
+
+
+// =============================================================================
+// 主 kernel：每个 splat 输出 clip 中心 + NDC 椭圆轴
+// =============================================================================
+[numthreads(64, 1, 1)]
+void ComputeSplatScreen(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= (uint)_Count) return;
+
+    float3 localPos = _PositionBuffer[idx];
+    float3 scale    = _ScaleBuffer[idx];
+    float4 rot      = _RotationBuffer[idx];
+
+    // ---- splat 局部 → 世界 → view ----
+    float3 worldPos = mul(_LocalToWorldMatrix, float4(localPos, 1.0)).xyz;
+    float3 viewPos  = mul(_ViewMatrix, float4(worldPos, 1.0)).xyz;
+
+    // ---- 近平面/背后剔除：写零轴 → quad 退化不可见 ----
+    if (viewPos.z > -_NearPlane)
+    {
+        _SplatClipPos[idx] = float4(0, 0, 0, 1);
+        _SplatAxis[idx]    = float4(0, 0, 0, 0);
+        return;
+    }
+
+    float4 clip = mul(_ProjectionMatrix, float4(viewPos, 1.0));
+
+    float fx = _ProjectionMatrix._m00;
+    float fy = _ProjectionMatrix._m11;
+
+    // ---- 3D 协方差：先把 GameObject 的旋转/缩放并入，Σ_world = L · Σ_local · L^T ----
+    // （L = localToWorld 的 3x3 部分；这样旋转/平移/缩放 Gsplat 物体时，
+    //    椭圆朝向会跟着一起转，而非停留在世界轴向）
+    float3x3 sigmaLocal  = ComputeCovariance3D(scale, rot);
+    float3x3 L           = (float3x3)_LocalToWorldMatrix;
+    float3x3 sigmaWorld  = mul(mul(L, sigmaLocal), transpose(L));
+    float2x2 sigmaPx     = ProjectCovarianceToScreen(sigmaWorld, viewPos, fx, fy, _ScreenSize);
+
+    // ---- 像素空间 → NDC 空间： NDC = pixel * (2/screenSize)，协方差乘 D·Σ·D^T ----
+    float2 ndcScale = 2.0 / _ScreenSize;
+    float2x2 sigmaNDC = float2x2(
+        sigmaPx[0][0] * ndcScale.x * ndcScale.x,
+        sigmaPx[0][1] * ndcScale.x * ndcScale.y,
+        sigmaPx[1][0] * ndcScale.x * ndcScale.y,
+        sigmaPx[1][1] * ndcScale.y * ndcScale.y
+    );
+
+    // ---- 特征分解 → NDC 空间两主轴（σ 单位）----
+    float2 lambda;
+    float2x2 U;
+    EigenDecomposeSymmetric2x2(sigmaNDC, lambda, U);
+
+    // λ 下限换算：MIN_LAMBDA2_PX2(px²) → NDC²，用屏幕高度方向系数（x/y 同量级）
+    float minLambdaNDC = MIN_LAMBDA2_PX2 * ndcScale.y * ndcScale.y;
+    lambda = max(lambda, minLambdaNDC);
+
+    float2 sigmaNDCLen = sqrt(lambda);           // 各方向标准差（NDC）
+    float2 axis1 = float2(U[0][0], U[1][0]) * sigmaNDCLen.x;   // v1 * σ1
+    float2 axis2 = float2(U[0][1], U[1][1]) * sigmaNDCLen.y;   // v2 * σ2
+
+    _SplatClipPos[idx] = clip;
+    _SplatAxis[idx]    = float4(axis1, axis2);
+}
+
+
+// =============================================================================
+// 排序相关 kernel（深度计算 + Bitonic Sort，back-to-front）
+// =============================================================================
+struct SortData
+{
+    float depth;
+    uint  index;
+};
+
+RWStructuredBuffer<SortData> _SortBuffer;
+RWStructuredBuffer<uint>     _SplatOrder;
+int _SortLevel;
+int _SortMask;
+
+// view 空间 Z（前方为负）。升序排列后最远的（最负）在最前 = back-to-front。
+// 注意：本 kernel 的 dispatch 数量按 paddedCount(2 的幂) 发，越界尾部填 +∞ 沉底。
+[numthreads(256, 1, 1)]
+void CalcViewDepth(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+
+    if (idx >= (uint)_Count)
+    {
+        _SortBuffer[idx].depth = 1e9;
+        _SortBuffer[idx].index = 0;
+        return;
+    }
+
+    float3 worldPos = mul(_LocalToWorldMatrix, float4(_PositionBuffer[idx], 1.0)).xyz;
+    float3 viewPos  = mul(_ViewMatrix, float4(worldPos, 1.0)).xyz;
+    _SortBuffer[idx].depth = viewPos.z;
+    _SortBuffer[idx].index = idx;
+}
+
+// Bitonic Sort 单步。外部按层级反复 dispatch，数量按 paddedCount 发。
+[numthreads(256, 1, 1)]
+void BitonicSort(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    uint j = i ^ _SortLevel;
+
+    if (j > i)
+    {
+        bool ascending = (i & _SortMask) == 0;
+
+        float di = _SortBuffer[i].depth;
+        float dj = _SortBuffer[j].depth;
+
+        bool swap = (ascending && di > dj) || (!ascending && di < dj);
+        if (swap)
+        {
+            SortData tmp = _SortBuffer[i];
+            _SortBuffer[i] = _SortBuffer[j];
+            _SortBuffer[j] = tmp;
+        }
+    }
+}
+
+// 排序完成后提取索引（只取前 _Count 个）
+[numthreads(256, 1, 1)]
+void CopySortedIndices(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= (uint)_Count) return;
+    _SplatOrder[idx] = _SortBuffer[idx].index;
+}
