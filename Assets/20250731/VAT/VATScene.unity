@@ -148,7 +148,7 @@ Transform:
   m_GameObject: {fileID: 72890819}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.09, y: 0, z: 34.23}
+  m_LocalPosition: {x: -9.47, y: 0, z: 48.36}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -449,7 +449,7 @@ Light:
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 2
+    m_Type: 0
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
@@ -635,7 +635,7 @@ Transform:
   m_GameObject: {fileID: 392084919}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -15.95, y: 0, z: 19.66}
+  m_LocalPosition: {x: 13.78, y: 0, z: 21.62}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1176,7 +1176,7 @@ VFXRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1753210477}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1215,7 +1215,7 @@ VisualEffect:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1753210477}
-  m_Enabled: 1
+  m_Enabled: 0
   m_Asset: {fileID: 8926484042661614526, guid: 974a990efa459ac4bacd420c55faea99, type: 3}
   m_InitialEventName: OnPlay
   m_InitialEventNameOverriden: 0
@@ -1245,16 +1245,16 @@ VisualEffect:
       - m_Value: {x: -1, y: -0.128, z: -0.4}
         m_Name: BoundMin
         m_Overridden: 1
-      - m_Value: {x: 0, y: 0, z: 0}
+      - m_Value: {x: 5.87, y: 0, z: -5.01}
         m_Name: P0
         m_Overridden: 1
-      - m_Value: {x: 14.86, y: 0, z: 13.92}
+      - m_Value: {x: -8.45, y: 0, z: 8.5199995}
         m_Name: P1
         m_Overridden: 1
-      - m_Value: {x: -10.45, y: 0, z: 27.99}
+      - m_Value: {x: 19.65, y: 0, z: 16.61}
         m_Name: P2
         m_Overridden: 1
-      - m_Value: {x: 7.06, y: 0, z: 51.75}
+      - m_Value: {x: -3.6000004, y: 0, z: 43.35}
         m_Name: P3
         m_Overridden: 1
     m_Vector4f:
@@ -1280,7 +1280,7 @@ VisualEffect:
       - m_Value: {fileID: 2800000, guid: e30bc106062d83b419cb7b15134bcc1d, type: 3}
         m_Name: ColorTexture
         m_Overridden: 1
-      - m_Value: {fileID: -2749265896460310151, guid: a78565b3cb687bb448a477a528d1ce10,
+      - m_Value: {fileID: -2749265896460310151, guid: eeb61e1888e8ae84dadd4ebfeb1a3b2c,
           type: 3}
         m_Name: VATMesh
         m_Overridden: 1
@@ -1295,7 +1295,7 @@ Transform:
   m_GameObject: {fileID: 1753210477}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 5.87, y: 0, z: -5.01}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1304,7 +1304,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1753210481
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 2
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -1319,7 +1319,7 @@ MonoBehaviour:
   Target: {fileID: 72890820}
 --- !u!114 &1753210482
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 2
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -1334,7 +1334,7 @@ MonoBehaviour:
   Target: {fileID: 392084920}
 --- !u!114 &1753210483
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 2
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -1349,7 +1349,7 @@ MonoBehaviour:
   Target: {fileID: 2030643680}
 --- !u!114 &1753210484
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 2
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -1533,7 +1533,7 @@ Transform:
   m_GameObject: {fileID: 2030643679}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 7.79, y: 0, z: 7.53}
+  m_LocalPosition: {x: -14.32, y: 0, z: 13.53}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
