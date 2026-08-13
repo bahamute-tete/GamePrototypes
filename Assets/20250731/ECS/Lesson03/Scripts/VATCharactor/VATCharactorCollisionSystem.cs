@@ -10,15 +10,15 @@ using Unity.Physics.Systems;
 [UpdateInGroup(typeof(AfterPhysicsSystemGroup))]
 partial struct VATCharactorCollisionSystem : ISystem
 {
-    private NativeQueue<Entity> m_VatCollisionEntities;
+    //private NativeQueue<Entity> m_VatCollisionEntities;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<SimulationSingleton>();
 
-        m_VatCollisionEntities =
-            new NativeQueue<Entity>(Allocator.Persistent);
+        //m_VatCollisionEntities =
+        //    new NativeQueue<Entity>(Allocator.Persistent);
     }
 
 
@@ -26,27 +26,28 @@ partial struct VATCharactorCollisionSystem : ISystem
     {
         var collisionJob = new VATCharactorCollisionJob
         {
-            CollisionQueue = m_VatCollisionEntities.AsParallelWriter(),
+            //CollisionQueue = m_VatCollisionEntities.AsParallelWriter(),
             dynamicBodies = SystemAPI.GetComponentLookup<PhysicsVelocity>(true),//用物理组件识别角色,动态角色有 PhysicsVelocity，静态地面没有
             landTags = SystemAPI.GetComponentLookup<HasLandedTag>(),
             landingReactionTags = SystemAPI.GetComponentLookup<LandingReactionTag>(),
         };
-        collisionJob.Schedule( SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency).Complete();
+       state.Dependency = collisionJob.Schedule(SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency);
 
 
-        while(m_VatCollisionEntities.TryDequeue(out var entity))
-        {
-            // Process the dequeued entity
-            UnityEngine.Debug.Log($"VATCharactor collided: {entity}");
-        }
+
+        //while(m_VatCollisionEntities.TryDequeue(out var entity))
+        //{
+        //    // Process the dequeued entity
+        //    UnityEngine.Debug.Log($"VATCharactor collided: {entity}");
+        //}
     }
 
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
-        state.Dependency.Complete();
-        if (m_VatCollisionEntities.IsCreated)
-            m_VatCollisionEntities.Dispose();
+        //state.Dependency.Complete();
+        //if (m_VatCollisionEntities.IsCreated)
+        //   m_VatCollisionEntities.Dispose();
     }
 }
 
@@ -59,7 +60,7 @@ public struct VATCharactorCollisionJob : ICollisionEventsJob
 
     [ReadOnly]
     public ComponentLookup<PhysicsVelocity> dynamicBodies;
-    public NativeQueue<Entity>.ParallelWriter CollisionQueue;
+    //public NativeQueue<Entity>.ParallelWriter CollisionQueue;
 
 
     //landTags 不能是 ReadOnly，因为需要在碰撞时修改它的状态
@@ -91,6 +92,7 @@ public struct VATCharactorCollisionJob : ICollisionEventsJob
     {
         if (!dynamicBodies.HasComponent(entity) || 
             !landTags.HasComponent(entity) || 
+            !landingReactionTags.HasComponent(entity)||
             landTags.IsComponentEnabled(entity) || 
             landingReactionTags.IsComponentEnabled(entity))
         { 
@@ -99,7 +101,7 @@ public struct VATCharactorCollisionJob : ICollisionEventsJob
 
         landTags.SetComponentEnabled(entity, true);
         landingReactionTags.SetComponentEnabled(entity, true);
-        CollisionQueue.Enqueue(entity);
+        //CollisionQueue.Enqueue(entity);
     }
    
 }
