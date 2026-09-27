@@ -131,6 +131,7 @@ public class SplineCurveMoveClipEditor : Editor
         var info = TimelineClipContext.Resolve(clip);
 
         EditorGUILayout.LabelField("Spline Curve Move Clip", EditorStyles.boldLabel);
+        SplineScenePathPreview.InspectorControls();
         DrawClipInfoBar(info);
 
         // [已停用] 基线漂移检测 + 重新校准（Pause Duration Recalibration）。
@@ -190,7 +191,7 @@ public class SplineCurveMoveClipEditor : Editor
         EditorGUILayout.Space(4);
 
         // ──────────────────────────────────────────────────────────────────
-        // ④ 曲线参数及其设置 (Curve Settings) — Alpha / Rotation / Banking / AxisLock
+        // ④ 曲线参数及其设置 (Curve Settings) — Alpha / Rotation / AxisLock
         // ──────────────────────────────────────────────────────────────────
         ShowOtherFields = EditorGUILayout.Foldout(ShowOtherFields, "④ 曲线参数及其设置 (Curve Settings)", true, EditorStyles.foldoutHeader);
         if (ShowOtherFields)
@@ -235,8 +236,11 @@ public class SplineCurveMoveClipEditor : Editor
     {
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField("参考系（Reference Frame）", EditorStyles.miniBoldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("pathSpace"), new GUIContent("路径空间"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("endMode"), new GUIContent("结束后"));
+        EditorGUILayout.HelpBox("更换路径空间或参考系后，请从控制点重新写入路径。移动参考系建议使用单位缩放。固定世界姿态支持同一 Timeline 的曲线轨道驱动参考系；外部动画/物理请使用保持参考系或交接。", MessageType.Info);
 
-        if (refFrameProp != null)
+        if (refFrameProp != null && serializedObject.FindProperty("pathSpace").enumValueIndex != (int)SplinePathSpace.World)
             EditorGUILayout.PropertyField(refFrameProp, new GUIContent("Reference Frame"));
 
         Transform resolved = ResolveRefFrameAtEditTime(clip);
@@ -281,6 +285,7 @@ public class SplineCurveMoveClipEditor : Editor
     private Transform ResolveRefFrameAtEditTime(SplineCurveMoveClip clip)
     {
         if (clip == null) return null;
+        if (clip.pathSpace == SplinePathSpace.World) return null;
         var dir = UnityEditor.Timeline.TimelineEditor.inspectedDirector;
         if (dir == null) return null;
         return clip.referenceFrame.Resolve(dir);
@@ -1735,6 +1740,7 @@ public class SplineCurveMoveClipEditor : Editor
         {
             enterChildren = false;
             if (iterator.name == excludeName) continue;
+            if (iterator.name == "useLocalSpace" && serializedObject.FindProperty("pathSpace").enumValueIndex != (int)SplinePathSpace.Legacy) continue;
             EditorGUILayout.PropertyField(iterator, true);
         }
     }

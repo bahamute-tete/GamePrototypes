@@ -1,9 +1,7 @@
 
-using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 public class FluidSPHSimulation : MonoBehaviour
 {
@@ -13,21 +11,29 @@ public class FluidSPHSimulation : MonoBehaviour
     public Vector2 initlaVelocity = new Vector2(-5.0f, 0);
     public int numParticles = 400;
     public IntegrationMethod integrationMethod = IntegrationMethod.SemiImplicitEuler;
-    public float timeStep = 0.002f;
+    [Min(0.0001f)] public float timeStep = 0.002f;
+    [Tooltip("每帧最多执行的子步数；未处理时间保留到下一帧。")]
+    [Min(1)] public int maxSubstepsPerFrame = 64;
+    [Tooltip("每秒速度衰减率，0 表示关闭额外全局阻尼。")]
+    [Min(0f)] public float dampingRate = 0f;
     
     [Header("SPH Parameters")]
     public float kernelRadius = 1.0f; //h 
     public float restDensity = 2.5f;  // ρ0
     public float stiffness = 150f;    // k
-    public float viscosity = 3.0f;   // μ
+    public float viscosity = 3.0f;   // 运动黏度 ν
     public float particleMass = 0.2f;// m
+    [Range(0.25f, 0.9f)] public float particleSpacingRatio = 0.5f;
+    [Tooltip("启动/重置时按规则晶格的内部密度标定质量；修改间距后请重置。")]
+    public bool autoCalibrateMass = true;
 
     [Header("Surface Tension")]
     public bool enableSurfaceTension = true;
     public bool enableSurfaceVisualization = false;
     public bool enableNormalVisualization = false;
     public float surfaceTensionCoefficient = 0.0728f; // σ
-    public float surfaceThreshold = 7.065f; // 临界值，用于判断表面粒子
+    [Tooltip("无量纲阈值：h * |颜色场梯度| 超过此值时判定为表面。")]
+    public float surfaceThreshold = 0.5f;
 
     [Header("Environment")]
     [Range(0, 1)] public float boundaryDamping = 0.5f; // 法向反弹系数 (0=不反弹, 1=完全反弹)
@@ -43,52 +49,41 @@ public class FluidSPHSimulation : MonoBehaviour
     public TextMeshProUGUI fps;
 
     private SpatialGrid2D grid2D;
+    private double accumulatedTime;
+    private float SurfaceGradientThreshold => surfaceThreshold / kernelRadius;
     private List<WaterParticle2D> particles = new List<WaterParticle2D>();
     private List<GameObject> entitys = new List<GameObject>();
     private List<SpriteRenderer> waterRenders = new List<SpriteRenderer>();
 
-    // Start is called before the first frame update
     void Start()
     {
+        ValidateParameters();
+        accumulatedTime = 0.0;
         grid2D = new SpatialGrid2D(kernelRadius);
-        // CalibrateParticleMass();
+        if (autoCalibrateMass) CalibrateParticleMass();
         SpawnParticles();
-        
-
+        RebuildGridAndDensities();
     }
 
-    private void SpawnParticlesInGrid()
+    private void OnValidate()
     {
-        particles.Clear();
-        //waterRenders.Clear();
-        //entitys.Clear();
+        ValidateParameters();
+    }
 
-        float spacing = kernelRadius * 0.5f; 
-        int particlesPerRow = (int)Mathf.Sqrt(numParticles);
-
-        Vector2 startPos = new Vector2(-particlesPerRow * spacing * 0.5f, -particlesPerRow * spacing * 0.5f);
-
-        for (int i = 0; i < numParticles; i++)
-        {
-            float x = (i % particlesPerRow) * spacing;
-            float y = (i / particlesPerRow) * spacing;
-
-            Vector2 pos = startPos + new Vector2(x, y);
-            pos += new Vector2(Random.value * 0.01f, Random.value * 0.01f);
-
-            var p = new WaterParticle2D(pos);
-            p.mass = particleMass;
-            p.velocity = initlaVelocity;
-            particles.Add(p);
-
-            //GameObject particleEntity = Instantiate(waterPrefab, transform);
-            //waterRenders.Add(particleEntity.GetComponent<SpriteRenderer>());
-            //particleEntity.transform.position = new Vector3(p.position.x, p.position.y, 0);
-            //particleEntity.transform.localScale = Vector3.one * kernelRadius * 3.0f;
-            //particleEntity.transform.parent = transform;
-            //entitys.Add(particleEntity);
-        }
-        
+    private void ValidateParameters()
+    {
+        kernelRadius = Mathf.Max(0.001f, kernelRadius);
+        restDensity = Mathf.Max(0.0001f, restDensity);
+        particleMass = Mathf.Max(0.0001f, particleMass);
+        particleSpacingRatio = Mathf.Clamp(particleSpacingRatio, 0.25f, 0.9f);
+        numParticles = Mathf.Max(1, numParticles);
+        timeStep = Mathf.Max(0.0001f, timeStep);
+        maxSubstepsPerFrame = Mathf.Max(1, maxSubstepsPerFrame);
+        stiffness = Mathf.Max(0f, stiffness);
+        viscosity = Mathf.Max(0f, viscosity);
+        dampingRate = Mathf.Max(0f, dampingRate);
+        surfaceThreshold = Mathf.Max(0f, surfaceThreshold);
+        surfaceTensionCoefficient = Mathf.Max(0f, surfaceTensionCoefficient);
     }
 
     /// <summary>
@@ -96,7 +91,7 @@ public class FluidSPHSimulation : MonoBehaviour
     /// </summary>
     private void CalibrateParticleMass()
     {
-        float spacing = kernelRadius * 0.5f;
+        float spacing = kernelRadius * particleSpacingRatio;
         float kernelSum = 0f;
 
         // 模拟一个完美的粒子晶格，计算中心粒子的核函数总和
@@ -123,9 +118,6 @@ public class FluidSPHSimulation : MonoBehaviour
             //  mass = restDensity / kernelSum
             particleMass = restDensity / kernelSum;
 
-            // 【技巧】稍微增加 5% 的质量，让初始密度略微大于 restDensity
-            // 这样会产生微小的正压力来预先抵抗重力，减少初始的下沉幅度
-            particleMass *= 1.05f;
 
             Debug.Log($"[SPH] Auto-calibrated Mass: {particleMass} to match RestDensity: {restDensity}");
         }
@@ -134,102 +126,89 @@ public class FluidSPHSimulation : MonoBehaviour
     private void SpawnParticles()
     {
         particles.Clear();
-        float spacing = kernelRadius * 0.5f;
+        float spacing = kernelRadius * particleSpacingRatio;
+        int columns = Mathf.CeilToInt(Mathf.Sqrt(numParticles));
+        int rows = Mathf.CeilToInt((float)numParticles / columns);
+        Vector2 extent = new Vector2((columns - 1) * spacing, (rows - 1) * spacing);
+        Vector2 minimum = new Vector2(bounds.min.x + 0.1f, bounds.min.y + 0.1f);
+        Vector2 maximum = new Vector2(bounds.max.x - 0.1f, bounds.max.y - 0.1f);
+        if (extent.x > maximum.x - minimum.x || extent.y > maximum.y - minimum.y)
+        {
+            Debug.LogError("[SPH] 初始晶格超出边界，请减少粒子数/间距或扩大 bounds。", this);
+            return;
+        }
 
-        // float poolHeight = bounds.size.y * 0.25f;
-        // Vector2 poolMin = new Vector2(bounds.min.x, bounds.min.y);
-
-        // int cols = Mathf.FloorToInt(bounds.size.x / spacing);
-        // int rows = Mathf.FloorToInt(poolHeight / spacing);
-
-        // // 居中偏移，保证粒子在边界内
-        // float xOffset = (bounds.size.x - cols * spacing) * 0.5f;
-
-        // for (int y = 0; y < rows; y++)
-        // {
-        //     for (int x = 0; x < cols; x++)
-        //     {
-        //         Vector2 pos = new Vector2(
-        //             poolMin.x + xOffset + x * spacing + spacing * 0.5f,
-        //             poolMin.y + y * spacing + spacing * 0.5f
-        //         );
-
-        //         // 随机扰动
-        //         pos += new Vector2(Random.value * 0.01f, Random.value * 0.01f);
-
-        //         var p = new WaterParticle2D(pos);
-        //         p.mass = particleMass;
-        //         p.velocity = Vector2.zero; // 水池初始静止
-        //         particles.Add(p);
-        //     }
-        // }
-
-        // 使用费马螺旋 (Fermat's Spiral) 生成均匀分布的圆形粒子团
-        // c 是缩放系数。为了让平均间距接近 spacing，c 需要调整
-        // 理论推导：c ≈ spacing / sqrt(π) ≈ spacing * 0.56
-        // 这里取 0.6f 稍微宽松一点，防止初始压力过大
-        float c = spacing * 0.6f;
-
+        // 规则晶格与质量标定使用相同间距，避免随机扰动引入初始密度噪声。
+        Vector2 center = new Vector2(bounds.center.x, bounds.center.y + bounds.size.y * 0.125f);
+        Vector2 start = center - extent * 0.5f;
+        start.x = Mathf.Clamp(start.x, minimum.x, maximum.x - extent.x);
+        start.y = Mathf.Clamp(start.y, minimum.y, maximum.y - extent.y);
         for (int i = 0; i < numParticles; i++)
         {
-            // 黄金角度 ≈ 137.508度，能保证最优的填充效率
-            float theta = i * 137.50776f * Mathf.Deg2Rad;
-            float r = c * Mathf.Sqrt(i);
-
-            float x = r * Mathf.Cos(theta);
-            float y = r * Mathf.Sin(theta);
-
-            Vector2 pos = new Vector2(x, y);
-
-            // 添加微小随机偏移，打破完美对称，避免数值计算中的奇异性
-            pos += new Vector2(Random.value * 0.01f, Random.value * 0.01f);
-
-            var p = new WaterParticle2D(pos+new Vector2(0,bounds.max.y/4.0f));
-            p.mass = particleMass;
-            p.velocity = initlaVelocity;
-            particles.Add(p);
+            Vector2 pos = start + new Vector2(i % columns, i / columns) * spacing;
+            particles.Add(new WaterParticle2D(pos) { mass = particleMass, velocity = initlaVelocity });
         }
     }
-    // Update is called once per frame
+
     void Update()
     {
-        if (grid2D.cellSize != kernelRadius) grid2D = new SpatialGrid2D(kernelRadius);
-           grid2D.Clear();
+        AdvanceSimulation(Time.deltaTime);
+        UpdateInfo();
+    }
 
-        // timeStep = Time.fixedDeltaTime;
+    private void AdvanceSimulation(float elapsedTime)
+    {
+        if (particles.Count == 0) return;
+        accumulatedTime += elapsedTime;
+        int steps = 0;
+        while (accumulatedTime >= timeStep && steps < maxSubstepsPerFrame)
+        {
+            SimulateStep(timeStep);
+            accumulatedTime -= timeStep;
+            steps++;
+        }
+        // 不丢弃不足一个子步的余数；过载时保留积压时间，避免依赖渲染 FPS。
+    }
 
+    private void RebuildGridAndDensities()
+    {
+        if (grid2D == null || grid2D.cellSize != kernelRadius)
+            grid2D = new SpatialGrid2D(kernelRadius);
+        grid2D.Clear();
         foreach (var p in particles)
         {
-            p.mass = particleMass; // 确保运行时修改生效
+            p.mass = particleMass;
             grid2D.InsertParticle(p);
         }
-       
+        foreach (var p in particles)
+            UpdateDensityAndPressure(p, grid2D.GetNeighbors(p));
+    }
+
+    private void SimulateStep(float dt)
+    {
+        RebuildGridAndDensities();
+
+        // 所有粒子的力都从同一时刻的位置、速度、密度计算。
         foreach (var p in particles)
         {
-            var neighbors = grid2D.GetNeighbors(p);
-            UpdateDensityAndPressure(p, neighbors);
+            p.acceleration = Vector2.zero;
+            ApplyInternalForces(p, grid2D.GetNeighbors(p));
+            ApplyExternalForces(p);
         }
 
+        // 完成全部力计算后才能修改位置和速度。
         foreach (var p in particles)
         {
-            var neighbors = grid2D.GetNeighbors(p);
-            ApplyInternalForces(p, neighbors);
-            ApplyExternalForces(p);
-
             if (integrationMethod == IntegrationMethod.Leapfrog)
-            {
-                IntegrateLeapfrog(p, timeStep);
-            }
+                IntegrateLeapfrog(p, dt);
             else
-            {
-                IntergrateSemiImplicitEuler(p, timeStep);
-            }
-
+                IntergrateSemiImplicitEuler(p, dt);
             ResolveBoundaries(p);
         }
+    }
 
-        //UpdatePosition();
-
+    private void UpdateInfo()
+    {
         if (infoText != null)
         {
             infoText.text = 
@@ -237,7 +216,7 @@ public class FluidSPHSimulation : MonoBehaviour
                 $"rho0: {restDensity}\n" +
                 $"k: {stiffness}\n" +
                 $"m: {particleMass}\n" +
-                $"mu: {viscosity}\n"+
+                $"nu: {viscosity}\n"+
                 $"Time Step: {timeStep}\n"+
                 $"ParticleNumbers: {particles.Count}\n";
 
@@ -260,7 +239,9 @@ public class FluidSPHSimulation : MonoBehaviour
         Vector2 aPressure = Vector2.zero;
         Vector2 aViscosity = Vector2.zero;
         Vector2 colorGradient = Vector2.zero;
-        float colorLaplacian = 0f;//用于累加颜色场的拉普拉斯值
+        // 自身的梯度为零，但拉普拉斯不为零，必须计入颜色场求和。
+        float colorLaplacian = p.mass / p.density
+            * SPHKernels.CalculatePoly6Laplacian(0f, kernelRadius);
 
         foreach (var neighbor in neighbours)
         {
@@ -268,15 +249,10 @@ public class FluidSPHSimulation : MonoBehaviour
 
             float r = dir.magnitude;
 
-            if (r < kernelRadius && r > 0.0001f)
+            if (r < kernelRadius)
             {
                 if (p.density > 0.0001f && neighbor.density > 0.0001f)
                 {
-                    // 错误实现（保留）：旧公式是 (p_i + p_j) / (2 * rho_j)，随后整体再除以 rho_i。
-                    // 这不是常用的对称压力加速度形式，近自由表面时更容易偏软或不稳定。
-                    // float pressureTerm = (p.pressure + neighbor.pressure) / (2f * neighbor.density);
-                    // F_pressure -= SPHKernels.SpikyKernelGradient(dir, r, kernelRadius) * pressureTerm * neighbor.mass;
-
                     // 正确实现：使用对称压力加速度
                     // a_i^pressure = -Σ m_j * (p_i/rho_i^2 + p_j/rho_j^2) * ∇W_ij
                     float pressureTerm =
@@ -288,12 +264,7 @@ public class FluidSPHSimulation : MonoBehaviour
                 Vector2 relativeV = neighbor.velocity - p.velocity;
                 if (neighbor.density > 0.0001f)
                 {
-                    // 错误实现（保留）：旧写法先累加“力”再统一除以 rho_i，
-                    // 与多数 WCSPH 实现中的粘性加速度写法不一致，量纲更不直观。
-                    // float viscosityTerm = viscosity * neighbor.mass  / neighbor.density;
-                    // F_viscosity += viscosityTerm * SPHKernels.ViscosityKernelLaplacian(r, kernelRadius) * relativeV;
-
-                    // 正确实现：直接累加粘性加速度项。
+                    // viscosity 表示运动黏度 ν，直接计算黏性加速度。
                     float viscosityTerm = viscosity * neighbor.mass / neighbor.density;
                     aViscosity += viscosityTerm * SPHKernels.ViscosityKernelLaplacian(r, kernelRadius) * relativeV;
                 }
@@ -312,14 +283,14 @@ public class FluidSPHSimulation : MonoBehaviour
         if (enableSurfaceTension)
         {
             float gradientMag = colorGradient.magnitude;
-            if (gradientMag > surfaceThreshold)
+            if (gradientMag > SurfaceGradientThreshold && gradientMag > 0.0001f)
             {
                 // 表面张力公式 (Müller 2003): F_surface = -σ * (∇²c) * (n / |n|)
                 // 其中 n = ∇c (colorGradient)
                 Vector2 n = colorGradient / gradientMag;
                 Vector2 surfaceTensionForce = -surfaceTensionCoefficient * colorLaplacian * n;
-                // 该项是单位质量下的附加加速度，直接累加到 aPressure。
-                aPressure += surfaceTensionForce;
+                // Müller 的表面张力项是力密度，除以 rho_i 后才是加速度。
+                aPressure += surfaceTensionForce / p.density;
             }
           
 
@@ -349,12 +320,10 @@ public class FluidSPHSimulation : MonoBehaviour
         p.pressure = Mathf.Max(0f, p.pressure); 
     }
 
+    // 保留旧枚举值以兼容序列化；这是恒加速度近似，并非完整 Leapfrog。
+    // 当前示例场景使用 SemiImplicitEuler。
     void IntegrateLeapfrog(WaterParticle2D p, float t)
     {
-        // 限制最大加速度
-        if (p.acceleration.sqrMagnitude > 10000f)
-            p.acceleration = p.acceleration.normalized * 100f;
-
         // 1. 计算半步速度: v(t + 0.5dt)
         Vector2 v_half = p.velocity + p.acceleration * t * 0.5f;
 
@@ -367,21 +336,17 @@ public class FluidSPHSimulation : MonoBehaviour
         p.velocity = v_half + p.acceleration * t * 0.5f;
 
         // 空气阻力/全局阻尼
-        p.velocity *= 0.99f;
+        p.velocity *= Mathf.Exp(-dampingRate * t);
 
         p.acceleration = Vector2.zero;
     }
 
     void IntergrateSemiImplicitEuler(WaterParticle2D p, float t)
     {
-        // 限制最大加速度
-        if (p.acceleration.sqrMagnitude > 10000f)
-            p.acceleration = p.acceleration.normalized * 100f;
-
         p.velocity += p.acceleration * t;
 
-        // 空气阻力/全局阻尼 (模拟空气阻力，数值越小阻力越大)
-        p.velocity *= 0.99f; 
+        // 按模拟时间衰减，改变子步数不会改变每秒阻尼强度。
+        p.velocity *= Mathf.Exp(-dampingRate * t);
 
         p.position += p.velocity * t;
         p.acceleration = Vector2.zero;
@@ -457,7 +422,7 @@ public class FluidSPHSimulation : MonoBehaviour
                 if (enableSurfaceVisualization)
                 {
                     float gradientMag = p.surfaceGradient.magnitude;
-                    if (gradientMag > surfaceThreshold)
+                    if (gradientMag > SurfaceGradientThreshold && gradientMag > 0.0001f)
                     {
                         Gizmos.color = Color.Lerp(new Color(0, 0.5f, 1f, Mathf.Clamp01(alpha)), Color.white, Mathf.Clamp01(alpha));
                         if (enableNormalVisualization)

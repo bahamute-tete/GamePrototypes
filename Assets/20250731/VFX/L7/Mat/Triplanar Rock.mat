@@ -9,6 +9,8 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Triplanar Rock
   m_Shader: {fileID: 4800000, guid: 55c2b5a7282d48d79bf415c621e5424b, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 5
@@ -17,6 +19,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -84,7 +87,7 @@ Material:
     m_Floats:
     - _AlphaCutoff: 0.5
     - _Coverage: 20
-    - _CoverageAmount: -1
+    - _CoverageAmount: -0.946
     - _CoverageFalloff: 2
     - _EnvironmentReflections: 1
     - _Metallic: 0.02
@@ -99,5 +102,5 @@ Material:
     - __dirty: 0
     m_Colors:
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TriplanarAlbedoColor: {r: 0.3490566, g: 0.3490566, b: 0.3490566, a: 1}
+    - _TriplanarAlbedoColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []

@@ -1,14 +1,15 @@
-using UnityEngine;
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 [ExecuteInEditMode]
 public class RoadPathManager : MonoBehaviour
 {
-    // 添加路径改变事件
-    public event System.Action onPathChanged;
+    public event Action onPathChanged;
 
     [Header("Path Settings")]
     public List<Transform> controlPoints = new List<Transform>();
+    [Min(2), Tooltip("全局模式为总点数；每段模式为每段细分数")]
     public int samplingPoints = 20;
     public bool autoUpdate = true;
 
@@ -16,825 +17,310 @@ public class RoadPathManager : MonoBehaviour
     public bool showGizmos = true;
     public float gizmoSize = 0.1f;
     public float directionLength = 1f;
-    public float controlPointSize = 0.5f;  // 添加这行：控制点大小
-    [Space]
+    public float controlPointSize = 0.5f;
     public Color pathColor = Color.green;
     public Color tangentColor = Color.blue;
     public Color upDirectionColor = Color.red;
     public Color controlPointColor = Color.yellow;
-    
-    private PathPoint[] currentPathPoints;
-    private Vector3[] lastPositions;
-    private Quaternion[] lastRotations; // 添加字段
-    private ControlPointData[] controlPointsData;
+
+    public enum SamplingMode { UniformPerSegment, UniformGlobal }
 
     [Header("Path Sampling Settings")]
-    [Tooltip("控制采样模式")]
     public SamplingMode pathSamplingMode = SamplingMode.UniformGlobal;
-    [Range(0.1f, 5f)]
-    public float densityFactor = 1f; // 点密度调整因子
+    [Range(0.1f, 5f)] public float densityFactor = 1f;
 
-    // 添加采样模式枚举
-    public enum SamplingMode
-    {
-        UniformPerSegment, // 每段固定数量点
-        UniformGlobal      // 全局等距分布点
-    }
-
-    // 简化的数据结构
-    [System.Serializable]
+    [Serializable]
     public struct PathPoint
     {
         public Vector3 position;
         public Vector3 tangent;
         public Vector3 up;
-        
-        // 添加默认构造函数
+        public float distance;
+        public Vector3 right => Vector3.Cross(up, tangent).normalized;
+
         public PathPoint(Vector3 pos, Vector3 tan, Vector3 upDir)
         {
             position = pos;
             tangent = tan;
             up = upDir;
+            distance = 0f;
         }
     }
 
     public struct ControlPointData
     {
-        public Vector3 position;
-        public Vector3 tangent;
-        public Vector3 up;
-        public Vector3 bitangent;
+        public Vector3 position, tangent, up, bitangent;
     }
 
-    // 公共访问方法
-    public ControlPointData[] GetControlPointsData()
-    {
-        // 即使点数量少于4，也需要更新和返回数据
-        if (controlPointsData == null || controlPointsData.Length != controlPoints.Count)
-        {
-            UpdateControlPointsData();
-        }
-        return controlPointsData;
-    }
+    private const float Epsilon = 0.00001f;
+    private PathPoint[] currentPathPoints = Array.Empty<PathPoint>();
+    private Transform[] lastReferences;
+    private Vector3[] lastPositions;
+    private Quaternion[] lastRotations;
+    private readonly List<Vector3> positions = new List<Vector3>();
+    private readonly List<Vector3> ups = new List<Vector3>();
+    private bool updating;
 
     public PathPoint[] GetPathPoints() => currentPathPoints;
 
-    // 核心更新方法
+    // Read current transforms without rotating or otherwise modifying the author's controls.
+    public ControlPointData[] GetControlPointsData()
+    {
+        if (!ReadControls()) return Array.Empty<ControlPointData>();
+        var result = new ControlPointData[positions.Count];
+        Vector3 previousUp = ups[0];
+        for (int i = 0; i < result.Length; i++)
+        {
+            PathPoint point = Evaluate(Mathf.Min(i, positions.Count - 2),
+                i == positions.Count - 1 ? 1f : 0f, previousUp);
+            previousUp = point.up;
+            result[i] = new ControlPointData
+            {
+                position = point.position, tangent = point.tangent,
+                up = point.up, bitangent = point.right
+            };
+        }
+        return result;
+    }
+
     public void UpdatePath()
     {
-        if (!ValidateControlPoints()) return;
-        
-        UpdateControlPointsData();
-        GeneratePathPoints();
-        NotifyDependents();
+        if (updating) return;
+        updating = true;
+        try
+        {
+            currentPathPoints = SamplePath(pathSamplingMode, samplingPoints, densityFactor);
+            CaptureControls();
+            // Empty/invalid paths must also notify consumers so old geometry is removed.
+            onPathChanged?.Invoke();
+        }
+        finally { updating = false; }
     }
 
-    private bool ValidateControlPoints()
+    /// <summary>Shared world-space sampler used by both preview and road geometry.</summary>
+    public PathPoint[] SamplePath(SamplingMode mode, int pointCount, float density)
     {
-        // 修改验证规则，允许少于4个点
-        if (controlPoints == null || controlPoints.Count == 0)
-        {
-            currentPathPoints = null;
-            return false;
-        }
+        if (!ReadControls()) return Array.Empty<PathPoint>();
+        pointCount = Mathf.Clamp(pointCount, 2, 100000);
+        density = Mathf.Clamp(density, 0.1f, 5f);
+        var samples = new List<PathPoint>();
+        Vector3 previousUp = ups[0];
 
-        // 检查空引用
-        for (int i = 0; i < controlPoints.Count; i++)
+        for (int segment = 0; segment < positions.Count - 1; segment++)
         {
-            if (controlPoints[i] == null)
+            int steps = mode == SamplingMode.UniformPerSegment ? pointCount :
+                Mathf.Clamp(Mathf.CeilToInt(Vector3.Distance(positions[segment],
+                    positions[segment + 1]) * density * 10f), 16, 4096);
+            for (int j = segment == 0 ? 0 : 1; j <= steps; j++)
             {
-                Debug.LogError($"控制点 {i} 为空");
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    // Path generation methods
-    private void UpdateControlPointsData()
-    {
-        // 点数检查，但不直接返回
-        if (controlPoints == null || controlPoints.Count == 0)
-        {
-            controlPointsData = null;
-            return;
-        }
-
-        // 创建新的控制点数据数组
-        controlPointsData = new ControlPointData[controlPoints.Count];
-
-        // 不同点数情况的处理
-        if (controlPoints.Count < 4)
-        {
-            // 少于4个点的情况使用直线模式
-            UpdateControlPointsDataLinear();
-        }
-        else
-        {
-            // 4个或更多点的情况使用曲线模式(原有代码)
-            for (int i = 0; i < controlPoints.Count; i++)
-            {
-                Transform controlPoint = controlPoints[i];
-                Vector3 position = controlPoint.position;
-                Vector3 tangent;
-
-                // 计算切线方向
-                if (i == 0)
+                PathPoint sample = Evaluate(segment, j / (float)steps, previousUp);
+                previousUp = sample.up;
+                if (samples.Count > 0)
                 {
-                    Vector3 p0 = position + (position - controlPoints[1].position);
-                    Vector3 p2 = controlPoints[1].position;
-                    Vector3 p3 = controlPoints[2].position;
-                    tangent = CatmullRomTangent(0, p0, position, p2, p3);
+                    PathPoint previous = samples[samples.Count - 1];
+                    float length = Vector3.Distance(previous.position, sample.position);
+                    if (length < Epsilon) continue;
+                    sample.distance = previous.distance + length;
                 }
-                else if (i == controlPoints.Count - 1)
-                {
-                    Vector3 p0 = controlPoints[i - 2].position;
-                    Vector3 p1 = controlPoints[i - 1].position;
-                    Vector3 p3 = position + (position - controlPoints[i - 1].position);
-                    tangent = CatmullRomTangent(1, p0, p1, position, p3);
-                }
-                else
-                {
-                    Vector3 p0 = controlPoints[i - 1].position;
-                    Vector3 p2 = controlPoints[i + 1].position;
-                    Vector3 p3 = i < controlPoints.Count - 2 ? controlPoints[i + 2].position : p2 + (p2 - controlPoints[i].position);
-                    tangent = CatmullRomTangent(0, p0, position, p2, p3);
-                }
-
-                // 对齐控制点的forward(Z轴)到切线方向
-                Quaternion targetRotation = Quaternion.LookRotation(tangent, controlPoint.up);
-                controlPoint.rotation = targetRotation;
-
-                // 使用控制点的本地坐标轴来定义方向
-                controlPointsData[i] = new ControlPointData
-                {
-                    position = position,
-                    tangent = controlPoint.forward,     // 切线方向 (Z轴)
-                    up = controlPoint.up,               // 上方向 (Y轴)
-                    bitangent = controlPoint.right      // 副切线方向 (X轴) - 注意这里改为right
-                };
-
-                #if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    UnityEditor.EditorUtility.SetDirty(controlPoint);
-                }
-                #endif
+                samples.Add(sample);
             }
         }
+
+        if (samples.Count < 2) return Array.Empty<PathPoint>();
+        if (mode == SamplingMode.UniformPerSegment) return samples.ToArray();
+
+        var uniform = new PathPoint[pointCount];
+        uniform[0] = samples[0];
+        uniform[pointCount - 1] = samples[samples.Count - 1];
+        float totalLength = uniform[pointCount - 1].distance;
+        int index = 0;
+        for (int i = 1; i < pointCount - 1; i++)
+        {
+            float distance = totalLength * i / (pointCount - 1);
+            while (index < samples.Count - 2 && samples[index + 1].distance < distance)
+                index++;
+            PathPoint a = samples[index];
+            PathPoint b = samples[index + 1];
+            float t = (distance - a.distance) / (b.distance - a.distance);
+            Vector3 tangent = Vector3.Lerp(a.tangent, b.tangent, t);
+            if (tangent.sqrMagnitude < Epsilon * Epsilon) tangent = b.position - a.position;
+            tangent.Normalize();
+            uniform[i] = new PathPoint(Vector3.Lerp(a.position, b.position, t), tangent,
+                FrameUp(tangent, Vector3.Slerp(a.up, b.up, t), uniform[i - 1].up));
+            uniform[i].distance = distance;
+        }
+        return uniform;
     }
 
-    // 添加新方法：处理少于4个点的控制点数据
-    private void UpdateControlPointsDataLinear()
+    private bool ReadControls()
     {
-        for (int i = 0; i < controlPoints.Count; i++)
+        positions.Clear();
+        ups.Clear();
+        if (controlPoints == null) return false;
+        foreach (Transform point in controlPoints)
         {
-            Transform controlPoint = controlPoints[i];
-            Vector3 position = controlPoint.position;
-            Vector3 tangent;
-            
-            if (controlPoints.Count == 1)
-            {
-                // 只有一个点，使用其当前朝向作为切线
-                tangent = controlPoint.forward;
-            }
-            else if (i == 0)
-            {
-                // 第一个点，朝向下一个点
-                tangent = (controlPoints[1].position - position).normalized;
-            }
-            else if (i == controlPoints.Count - 1)
-            {
-                // 最后一个点，使用来自前一个点的方向
-                tangent = (position - controlPoints[i - 1].position).normalized;
-            }
-            else
-            {
-                // 中间点，使用前后点的平均方向
-                Vector3 prevDir = (position - controlPoints[i - 1].position).normalized;
-                Vector3 nextDir = (controlPoints[i + 1].position - position).normalized;
-                tangent = ((prevDir + nextDir) * 0.5f).normalized;
-            }
-            
-            // 对齐控制点的forward到切线方向
-            Quaternion targetRotation = Quaternion.LookRotation(tangent, controlPoint.up);
-            controlPoint.rotation = targetRotation;
-            
-            // 保存数据
-            controlPointsData[i] = new ControlPointData
-            {
-                position = position,
-                tangent = controlPoint.forward,
-                up = controlPoint.up,
-                bitangent = controlPoint.right
-            };
-            
-            #if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                UnityEditor.EditorUtility.SetDirty(controlPoint);
-            }
-            #endif
+            if (point == null) { positions.Clear(); ups.Clear(); return false; }
+            Vector3 position = point.position;
+            if (!Finite(position)) { positions.Clear(); ups.Clear(); return false; }
+            // Coincident adjacent controls have no usable segment or tangent.
+            if (positions.Count > 0 &&
+                (position - positions[positions.Count - 1]).sqrMagnitude < Epsilon * Epsilon)
+                continue;
+            positions.Add(position);
+            ups.Add(point.up);
         }
+        return positions.Count >= 2;
     }
 
-    private void GeneratePathPoints()
+    private static bool Finite(Vector3 value) =>
+        !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+        !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+        !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+
+    private Vector3 Position(int index)
     {
-        // 检查控制点列表
-        if (controlPoints == null || controlPoints.Count == 0)
-        {
-            Debug.LogWarning("控制点列表为空，请添加控制点");
-            return;
-        }
-        
-        // 检查是否存在空引用
-        for (int i = 0; i < controlPoints.Count; i++)
-        {
-            if (controlPoints[i] == null)
-            {
-                Debug.LogError($"控制点列表中第 {i} 个点为空，请检查控制点");
-                return;
-            }
-        }
-
-        // 处理少于4个控制点的情况 - 使用直线连接
-        if (controlPoints.Count < 4)
-        {
-            GeneratePathPointsLinear();
-            return;
-        }
-
-        // 采用全局均匀采样
-        if (pathSamplingMode == SamplingMode.UniformGlobal)
-        {
-            GenerateGloballyUniformPathPoints();
-        }
-        else // 默认采用原有的每段固定数量采样
-        {
-            GenerateSegmentUniformPathPoints();
-        }
+        if (index < 0) return positions[0] * 2f - positions[1];
+        if (index >= positions.Count)
+            return positions[positions.Count - 1] * 2f - positions[positions.Count - 2];
+        return positions[index];
     }
 
-    // 修改直线模式下的路径点生成方法
-    private void GeneratePathPointsLinear()
+    private PathPoint Evaluate(int segment, float t, Vector3 previousUp)
     {
-        List<PathPoint> pathPoints = new List<PathPoint>();
-        
-        // 特殊情况：只有一个点
-        if (controlPoints.Count == 1)
-        {
-            Vector3 position = controlPoints[0].position;
-            Vector3 tangent = controlPoints[0].forward;
-            Vector3 up = CalculateUp(tangent);
-            
-            pathPoints.Add(new PathPoint(position, tangent, up));
-            currentPathPoints = pathPoints.ToArray();
-            return;
-        }
-        
-        // 计算每段路径应该分配的采样点数
-        int totalSegments = controlPoints.Count - 1;
-        int pointsPerSegment = Mathf.Max(2, samplingPoints / totalSegments);
-        
-        // 生成路径点
-        for (int i = 0; i < controlPoints.Count - 1; i++)
-        {
-            Vector3 startPos = controlPoints[i].position;
-            Vector3 endPos = controlPoints[i + 1].position;
-            Vector3 direction = (endPos - startPos).normalized;
-            Vector3 up = CalculateUp(direction);
-            
-            // 添加起始点(除第一段外，其他段不需要重复添加)
-            if (i == 0)
-            {
-                pathPoints.Add(new PathPoint(startPos, direction, up));
-            }
-            
-            // 添加中间点
-            for (int j = 1; j < pointsPerSegment; j++)
-            {
-                float t = j / (float)pointsPerSegment;
-                Vector3 position = Vector3.Lerp(startPos, endPos, t);
-                pathPoints.Add(new PathPoint(position, direction, up));
-            }
-            
-            // 添加终点(作为下一段的起点，最后一段除外)
-            if (i < controlPoints.Count - 2)
-            {
-                // 对于中间控制点，需要计算平滑的切线方向
-                Vector3 prevDirection = direction;
-                Vector3 nextDirection = (controlPoints[i + 2].position - endPos).normalized;
-                Vector3 blendedDirection = (prevDirection + nextDirection).normalized;
-                Vector3 blendedUp = CalculateUp(blendedDirection);
-                
-                pathPoints.Add(new PathPoint(endPos, blendedDirection, blendedUp));
-            }
-        }
-        
-        // 添加最终点 - 确保使用原始控制点
-        Vector3 finalPos = controlPoints[controlPoints.Count - 1].position;
-        Vector3 finalDir = (finalPos - controlPoints[controlPoints.Count - 2].position).normalized;
-        Vector3 finalUp = CalculateUp(finalDir);
-        
-        pathPoints.Add(new PathPoint(finalPos, finalDir, finalUp));
-        
-        currentPathPoints = pathPoints.ToArray();
+        Vector3 a = Position(segment - 1), b = Position(segment);
+        Vector3 c = Position(segment + 1), d = Position(segment + 2);
+        float t2 = t * t, t3 = t2 * t;
+        Vector3 position = 0.5f * ((2f * b) + (-a + c) * t +
+            (2f * a - 5f * b + 4f * c - d) * t2 + (-a + 3f * b - 3f * c + d) * t3);
+        Vector3 tangent = 0.5f * ((-a + c) +
+            (2f * a - 5f * b + 4f * c - d) * (2f * t) +
+            (-a + 3f * b - 3f * c + d) * (3f * t2));
+        if (tangent.sqrMagnitude < Epsilon * Epsilon) tangent = c - b;
+        tangent.Normalize();
+        // Preserve exact endpoints and interpolate the authored banking reference.
+        if (t == 0f) position = b;
+        if (t == 1f) position = c;
+        Vector3 up = FrameUp(tangent, Vector3.Slerp(ups[segment], ups[segment + 1], t), previousUp);
+        return new PathPoint(position, tangent, up);
     }
 
-    // 原有的每段固定点数采样方法 - 修复起点和终点处理
-    private void GenerateSegmentUniformPathPoints()
+    private static Vector3 FrameUp(Vector3 tangent, Vector3 preferred, Vector3 previous)
     {
-        // 首先生成密集的临时采样点来计算总长度
-        List<PathPoint> temporaryPoints = new List<PathPoint>();
-        float smallIncrement = 0.01f; // 使用较小的增量进行密集采样
-        
-        // 确保起点被添加
-        Vector3 startPos = controlPoints[0].position;
-        Vector3 startTangent = (controlPoints[1].position - startPos).normalized;
-        Vector3 startUp = CalculateUp(startTangent);
-        temporaryPoints.Add(new PathPoint(startPos, startTangent, startUp));
-        
-        for (int i = 0; i < controlPoints.Count - 1; i++)
-        {
-            Vector3 p0 = GetPoint(i - 1);
-            Vector3 p1 = GetPoint(i);
-            Vector3 p2 = GetPoint(i + 1);
-            Vector3 p3 = GetPoint(i + 2);
-            
-            // 对当前段进行密集采样 - 跳过起点
-            for (float t = smallIncrement; t <= 1f; t += smallIncrement)
-            {
-                Vector3 position = CatmullRomPoint(t, p0, p1, p2, p3);
-                Vector3 tangent = CatmullRomTangent(t, p0, p1, p2, p3);
-                Vector3 up = CalculateUp(tangent);
-                temporaryPoints.Add(new PathPoint(position, tangent, up));
-                
-                // 确保最后一段的终点使用原始控制点
-                if (i == controlPoints.Count - 2 && t >= 1f - smallIncrement)
-                {
-                    Vector3 endPos = controlPoints[controlPoints.Count - 1].position;
-                    Vector3 endTangent = (endPos - controlPoints[controlPoints.Count - 2].position).normalized;
-                    Vector3 endUp = CalculateUp(endTangent);
-                    temporaryPoints.Add(new PathPoint(endPos, endTangent, endUp));
-                }
-            }
-        }
-        
-        // 计算总长度
-        float totalLength = 0f;
-        for (int i = 0; i < temporaryPoints.Count - 1; i++)
-        {
-            totalLength += Vector3.Distance(temporaryPoints[i].position, temporaryPoints[i + 1].position);
-        }
-        
-        // 计算目标间隔距离
-        float targetSegmentLength = totalLength / (samplingPoints - 1);
-        
-        // 生成最终的均匀分布点
-        List<PathPoint> finalPoints = new List<PathPoint>();
-        finalPoints.Add(temporaryPoints[0]); // 添加起点
-        
-        float currentDistance = 0f;
-        float accumulatedDistance = 0f;
-        int currentIndex = 0;
-        
-        // 在目标间隔处采样点
-        for (int i = 1; i < samplingPoints - 1; i++)
-        {
-            float targetDistance = i * targetSegmentLength;
-            
-            // 找到目标距离所在的位置
-            while (accumulatedDistance < targetDistance && currentIndex < temporaryPoints.Count - 1)
-            {
-                currentDistance = Vector3.Distance(temporaryPoints[currentIndex].position, 
-                    temporaryPoints[currentIndex + 1].position);
-                accumulatedDistance += currentDistance;
-                currentIndex++;
-            }
-            
-            // 计算插值位置
-            float overshoot = accumulatedDistance - targetDistance;
-            float t = 1 - (overshoot / currentDistance);
-            
-            // 在临近点之间插值
-            int prevIndex = currentIndex - 1;
-            Vector3 position = Vector3.Lerp(temporaryPoints[prevIndex].position, 
-                temporaryPoints[currentIndex].position, t);
-            Vector3 tangent = Vector3.Lerp(temporaryPoints[prevIndex].tangent, 
-                temporaryPoints[currentIndex].tangent, t).normalized;
-            Vector3 up = CalculateUp(tangent);
-            
-            finalPoints.Add(new PathPoint(position, tangent, up));
-        }
-        
-        // 添加终点(确保使用原始控制点的终点)
-        Vector3 finalPos = controlPoints[controlPoints.Count - 1].position;
-        Vector3 finalTangent = (finalPos - controlPoints[controlPoints.Count - 2].position).normalized;
-        Vector3 finalUp = CalculateUp(finalTangent);
-        finalPoints.Add(new PathPoint(finalPos, finalTangent, finalUp));
-        
-        currentPathPoints = finalPoints.ToArray();
+        Vector3 up = Vector3.ProjectOnPlane(preferred, tangent);
+        if (up.sqrMagnitude < Epsilon * Epsilon) up = Vector3.ProjectOnPlane(previous, tangent);
+        if (up.sqrMagnitude < Epsilon * Epsilon)
+            up = Vector3.ProjectOnPlane(Mathf.Abs(tangent.y) < 0.9f ? Vector3.up : Vector3.forward, tangent);
+        return up.normalized;
     }
 
-    // 新增全局均匀采样方法 - 修复起点和终点处理
-    private void GenerateGloballyUniformPathPoints()
-    {
-        // 第一步：创建一个详细的长度映射数组，存储每个控制点段落的近似累积长度
-        float[] segmentLengths = new float[controlPoints.Count - 1];
-        float[] cumulativeLengths = new float[controlPoints.Count];
-        cumulativeLengths[0] = 0f;
-        float totalApproxLength = 0f;
-        
-        for (int i = 0; i < controlPoints.Count - 1; i++)
-        {
-            // 使用直线距离作为每段曲线的粗略长度估计
-            Vector3 p1 = controlPoints[i].position;
-            Vector3 p2 = controlPoints[i + 1].position;
-            float segmentLength = Vector3.Distance(p1, p2);
-            
-            // 曲线通常比直线长，因此添加一个系数来修正（可根据实际曲率调整）
-            segmentLength *= 1.2f; 
-            
-            segmentLengths[i] = segmentLength;
-            totalApproxLength += segmentLength;
-            cumulativeLengths[i + 1] = totalApproxLength;
-        }
-        
-        // 第二步：精确计算每段曲线的实际长度
-        List<List<PathPoint>> segmentPoints = new List<List<PathPoint>>();
-        List<float> actualSegmentLengths = new List<float>();
-        float totalActualLength = 0f;
-        
-        // 为每段曲线生成密集采样点
-        for (int i = 0; i < controlPoints.Count - 3; i++) // 注意范围变化，考虑曲线需要4个控制点
-        {
-            Vector3 p0 = GetPoint(i);
-            Vector3 p1 = GetPoint(i + 1);
-            Vector3 p2 = GetPoint(i + 2);
-            Vector3 p3 = GetPoint(i + 3);
-            
-            // 根据估计长度动态调整采样密度
-            float segmentEstimatedLength = segmentLengths[i];
-            int pointCount = Mathf.Max(10, Mathf.CeilToInt(segmentEstimatedLength * 5 * densityFactor)); // 密集采样
-            float increment = 1f / pointCount;
-            
-            List<PathPoint> currentSegmentPoints = new List<PathPoint>();
-            float currentSegmentLength = 0f;
-            
-            PathPoint? prevPoint = null; // 使用可空类型
-            
-            for (float t = 0f; t <= 1f; t += increment)
-            {
-                Vector3 pos = CatmullRomPoint(t, p0, p1, p2, p3);
-                Vector3 tan = CatmullRomTangent(t, p0, p1, p2, p3);
-                Vector3 upDir = CalculateUp(tan);
-                
-                PathPoint point = new PathPoint(pos, tan, upDir);
-                
-                if (prevPoint.HasValue) // 使用可空类型的HasValue检查
-                {
-                    currentSegmentLength += Vector3.Distance(prevPoint.Value.position, point.position);
-                }
-                
-                currentSegmentPoints.Add(point);
-                prevPoint = point;
-            }
-            
-            segmentPoints.Add(currentSegmentPoints);
-            actualSegmentLengths.Add(currentSegmentLength);
-            totalActualLength += currentSegmentLength;
-        }
-        
-        // 特殊处理：如果只有3个控制点，则使用线性插值
-        if (controlPoints.Count == 3)
-        {
-            GeneratePathPointsLinear();
-            return;
-        }
-        
-        // 第三步：全局均匀采样
-        List<PathPoint> uniformPoints = new List<PathPoint>();
-        float spacingDistance = totalActualLength / (samplingPoints - 1);
-        
-        // 总是添加第一个控制点作为起点
-        Vector3 firstPos = controlPoints[0].position;
-        Vector3 firstTangent = (controlPoints[1].position - firstPos).normalized;
-        Vector3 firstUp = CalculateUp(firstTangent);
-        uniformPoints.Add(new PathPoint(firstPos, firstTangent, firstUp));
-        
-        float accumulatedDistance = 0f;
-        int currentSegment = 0;
-        int currentPointIndex = 0;
-        
-        for (int i = 1; i < samplingPoints - 1; i++)
-        {
-            float targetDistance = i * spacingDistance;
-            
-            // 找到目标距离所在的段
-            while (currentSegment < segmentPoints.Count && 
-                   accumulatedDistance + actualSegmentLengths[currentSegment] < targetDistance)
-            {
-                accumulatedDistance += actualSegmentLengths[currentSegment];
-                currentSegment++;
-                currentPointIndex = 0;
-            }
-            
-            if (currentSegment >= segmentPoints.Count)
-            {
-                // 已经超出了所有段，直接添加最后一个点
-                break;
-            }
-            
-            // 在当前段内，找到目标距离所在的具体位置
-            List<PathPoint> currentPoints = segmentPoints[currentSegment];
-            float segmentAccumDistance = 0f;
-            
-            while (currentPointIndex < currentPoints.Count - 1 && 
-                   accumulatedDistance + segmentAccumDistance < targetDistance)
-            {
-                segmentAccumDistance += Vector3.Distance(
-                    currentPoints[currentPointIndex].position,
-                    currentPoints[currentPointIndex + 1].position);
-                currentPointIndex++;
-            }
-            
-            // 计算插值参数
-            float segmentTargetDistance = targetDistance - accumulatedDistance;
-            float pointDistance = Vector3.Distance(
-                currentPoints[Mathf.Max(0, currentPointIndex - 1)].position,
-                currentPoints[currentPointIndex].position);
-            float localRatio = (segmentTargetDistance - (segmentAccumDistance - pointDistance)) / pointDistance;
-            
-            // 对位置、切线和上向量进行插值
-            PathPoint prevPoint = currentPoints[Mathf.Max(0, currentPointIndex - 1)];
-            PathPoint nextPoint = currentPoints[currentPointIndex];
-            
-            PathPoint interpolatedPoint = new PathPoint(
-                Vector3.Lerp(prevPoint.position, nextPoint.position, localRatio),
-                Vector3.Lerp(prevPoint.tangent, nextPoint.tangent, localRatio).normalized,
-                Vector3.Lerp(prevPoint.up, nextPoint.up, localRatio).normalized
-            );
-            
-            uniformPoints.Add(interpolatedPoint);
-        }
-        
-        // 添加最后一个控制点作为终点
-        int lastIndex = controlPoints.Count - 1;
-        Vector3 lastPos = controlPoints[lastIndex].position;
-        Vector3 lastTangent = (lastPos - controlPoints[lastIndex - 1].position).normalized;
-        Vector3 lastUp = CalculateUp(lastTangent);
-        uniformPoints.Add(new PathPoint(lastPos, lastTangent, lastUp));
-        
-        currentPathPoints = uniformPoints.ToArray();
-    }
-
-    // Utility methods
-    private Vector3 GetPoint(int index)
-    {
-        if (index < 0)
-            return controlPoints[0].position * 2 - controlPoints[1].position;
-        if (index >= controlPoints.Count)
-            return controlPoints[controlPoints.Count - 1].position * 2 - controlPoints[controlPoints.Count - 2].position;
-        return controlPoints[index].position;
-    }
-    
-    private Vector3 CatmullRomPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
-    {
-        float t2 = t * t;
-        float t3 = t2 * t;
-        
-        return 0.5f * (
-            (-t3 + 2f * t2 - t) * p0 +
-            (3f * t3 - 5f * t2 + 2f) * p1 +
-            (-3f * t3 + 4f * t2 + t) * p2 +
-            (t3 - t2) * p3
-        );
-    }
-    
-    private Vector3 CatmullRomTangent(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
-    {
-        float t2 = t * t;
-        
-        return 0.5f * (
-            (-3f * t2 + 4f * t - 1f) * p0 +
-            (9f * t2 - 10f * t) * p1 +
-            (-9f * t2 + 8f * t + 1f) * p2 +
-            (3f * t2 - 2f * t) * p3
-        ).normalized;
-    }
-    
-    private Vector3 CalculateUp(Vector3 tangent)
-    {
-        Vector3 up = Vector3.up;
-        Vector3 right = Vector3.Cross(up, tangent).normalized;
-        return Vector3.Cross(tangent, right).normalized;
-    }
-
-    // Control point management
     public void CreateControlPoint()
     {
-        GameObject pointObject = new GameObject($"ControlPoint_{controlPoints.Count}");
-        Transform pointTransform = pointObject.transform;
-        pointTransform.SetParent(transform);
-        
-        // 设置初始位置
-        Vector3 newPosition;
-        if (controlPoints.Count == 0)
+        if (controlPoints == null) controlPoints = new List<Transform>();
+        var pointObject = new GameObject($"ControlPoint_{controlPoints.Count}");
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
         {
-            newPosition = transform.position;
-            pointTransform.rotation = Quaternion.identity; // 第一个点使用默认旋转
+            UnityEditor.Undo.RegisterCreatedObjectUndo(pointObject, "添加道路控制点");
+            UnityEditor.Undo.RecordObject(this, "添加道路控制点");
         }
-        else
-        {
-            // 使用前一个点的方向信息
-            Transform lastPoint = controlPoints[controlPoints.Count - 1];
-            newPosition = lastPoint.position + lastPoint.forward * 2f; // 使用forward(Z轴)作为前进方向
-            pointTransform.rotation = lastPoint.rotation; // 继承前一个点的旋转
-        }
-        
-        pointTransform.position = newPosition;
-        controlPoints.Add(pointTransform);
-        UpdatePath();
+#endif
+        Transform point = pointObject.transform;
+        point.SetParent(transform, false);
+        Transform last = controlPoints.Count > 0 ? controlPoints[controlPoints.Count - 1] : null;
+        ControlPointData[] data = GetControlPointsData();
+        Vector3 forward = data.Length > 0 ? data[data.Length - 1].tangent :
+            (last != null ? last.forward : transform.forward);
+        point.position = last != null ? last.position + forward * 2f : transform.position;
+        point.rotation = last != null ? last.rotation : transform.rotation;
+        controlPoints.Add(point);
+        if (autoUpdate) UpdatePath();
     }
 
-    private void NotifyDependents()
+    private bool ControlsChanged()
     {
-        // 触发路径改变事件
-        onPathChanged?.Invoke();
-
-        var roadMesh = GetComponent<RoadMeshGenerator>();
-        if (roadMesh != null) roadMesh.GenerateRoadMesh();
+        int count = controlPoints == null ? 0 : controlPoints.Count;
+        if (lastReferences == null || lastReferences.Length != count) return true;
+        for (int i = 0; i < count; i++)
+        {
+            Transform point = controlPoints[i];
+            if (lastReferences[i] != point) return true;
+            if (point != null && (lastPositions[i] != point.position || lastRotations[i] != point.rotation))
+                return true;
+        }
+        return false;
     }
 
-    // Unity callbacks
-    void OnValidate()
+    private void CaptureControls()
     {
-        // 避免在检查阶段执行重量级操作
-        // 而是通过延迟执行方式安排在下一帧执行
-        if (autoUpdate)
+        int count = controlPoints == null ? 0 : controlPoints.Count;
+        lastReferences = new Transform[count];
+        lastPositions = new Vector3[count];
+        lastRotations = new Quaternion[count];
+        for (int i = 0; i < count; i++)
         {
-            #if UNITY_EDITOR
-            if (Application.isPlaying)
-            {
-                // 在游戏运行时可以直接更新
-                UpdatePath();
-            }
-            else
-            {
-                // 在编辑模式下，延迟更新
-                UnityEditor.EditorApplication.delayCall += () =>
-                {
-                    if (this != null) // 检查对象是否仍然存在
-                    {
-                        UpdatePath();
-                    }
-                };
-            }
-            #else
-            UpdatePath();
-            #endif
+            Transform point = controlPoints[i];
+            lastReferences[i] = point;
+            if (point == null) continue;
+            lastPositions[i] = point.position;
+            lastRotations[i] = point.rotation;
         }
     }
 
-    void Update()
+    private void Update() { if (autoUpdate && ControlsChanged()) UpdatePath(); }
+    private void OnEnable()
     {
-        if (autoUpdate) CheckControlPointsChanged();
+#if UNITY_EDITOR
+        UnityEditor.Undo.undoRedoPerformed += OnUndoRedo;
+#endif
+        RequestUpdate();
     }
+    private void OnDisable()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.delayCall -= DelayedUpdate;
+        UnityEditor.Undo.undoRedoPerformed -= OnUndoRedo;
+#endif
+    }
+    private void OnValidate() { RequestUpdate(); }
+    private void RequestUpdate()
+    {
+#if UNITY_EDITOR
+        // Coalesce inspector changes; never create geometry in OnValidate.
+        UnityEditor.EditorApplication.delayCall -= DelayedUpdate;
+        UnityEditor.EditorApplication.delayCall += DelayedUpdate;
+#else
+        if (autoUpdate && isActiveAndEnabled) UpdatePath();
+#endif
+    }
+#if UNITY_EDITOR
+    private void DelayedUpdate()
+    {
+        if (this != null && isActiveAndEnabled && autoUpdate) UpdatePath();
+    }
+    private void OnUndoRedo()
+    {
+        if (this != null && isActiveAndEnabled) UpdatePath();
+    }
+#endif
 
-    void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         if (!showGizmos) return;
-        DrawControlPoints();
-        DrawPath();
-    }
-
-    // Debug visualization
-    private void DrawControlPoints()
-    {
+        Gizmos.color = controlPointColor;
         if (controlPoints != null)
+            foreach (Transform point in controlPoints)
+                if (point != null) Gizmos.DrawWireSphere(point.position, controlPointSize);
+        if (currentPathPoints == null) return;
+        for (int i = 0; i < currentPathPoints.Length; i++)
         {
-            // 获取控制点数据
-            var pointsData = GetControlPointsData();
-            
-            if (pointsData != null)
-            {
-                for (int i = 0; i < controlPoints.Count; i++)
-                {
-                    if (controlPoints[i] != null)
-                    {
-                        Vector3 position = controlPoints[i].position;
-                        
-                        // 绘制控制点球体
-                        Gizmos.color = controlPointColor;
-                        Gizmos.DrawWireSphere(position, controlPointSize);
-                        
-                        // 绘制坐标轴
-                        float axisSize = directionLength;
-                        
-                        // 切线方向 (蓝色)
-                        Gizmos.color = Color.blue;
-                        Gizmos.DrawRay(position, pointsData[i].tangent * axisSize);
-                        
-                        // Up方向 (绿色)
-                        Gizmos.color = Color.green;
-                        Gizmos.DrawRay(position, pointsData[i].up * axisSize);
-                        
-                        // 副切线方向 (红色)
-                        Gizmos.color = Color.red;
-                        Gizmos.DrawRay(position, pointsData[i].bitangent * axisSize);
-                        
-                        // 绘制小球标示轴端点
-                        float endPointSize = controlPointSize * 0.3f;
-                        Gizmos.color = Color.blue;
-                        Gizmos.DrawSphere(position + pointsData[i].tangent * axisSize, endPointSize);
-                        Gizmos.color = Color.green;
-                        Gizmos.DrawSphere(position + pointsData[i].up * axisSize, endPointSize);
-                        Gizmos.color = Color.red;
-                        Gizmos.DrawSphere(position + pointsData[i].bitangent * axisSize, endPointSize);
-                    }
-                }
-            }
-        }
-    }
-
-    // 修改DrawPath方法以正确显示路径
-    private void DrawPath()
-    {
-        if (currentPathPoints != null && currentPathPoints.Length > 1)
-        {
-            // 绘制路径线
+            PathPoint point = currentPathPoints[i];
             Gizmos.color = pathColor;
-            for (int i = 0; i < currentPathPoints.Length - 1; i++)
-            {
-                // 这里的position已经是世界坐标，所以不需要转换
-                Gizmos.DrawLine(currentPathPoints[i].position, currentPathPoints[i + 1].position);
-            }
-
-            // 绘制采样点的方向
-            for (int i = 0; i < currentPathPoints.Length; i++)
-            {
-                Vector3 position = currentPathPoints[i].position;
-                
-                // 绘制采样点位置
-                Gizmos.color = Color.white;
-                Gizmos.DrawWireSphere(position, gizmoSize * 0.5f);
-                
-                // 绘制切线方向
-                Gizmos.color = tangentColor;
-                Gizmos.DrawRay(position, currentPathPoints[i].tangent * directionLength * 0.5f);
-
-                // 绘制上方向
-                Gizmos.color = upDirectionColor;
-                Gizmos.DrawRay(position, currentPathPoints[i].up * directionLength * 0.5f);
-            }
-        }
-    }
-
-    private void CheckControlPointsChanged()
-    {
-        if (controlPoints == null || controlPoints.Count == 0) return;
-
-        // 初始化或重新初始化数组
-        if (lastPositions == null || lastRotations == null || 
-            lastPositions.Length != controlPoints.Count || 
-            lastRotations.Length != controlPoints.Count)
-        {
-            lastPositions = new Vector3[controlPoints.Count];
-            lastRotations = new Quaternion[controlPoints.Count];
-            
-            // 初始化时保存当前状态
-            for (int i = 0; i < controlPoints.Count; i++)
-            {
-                if (controlPoints[i] != null)
-                {
-                    lastPositions[i] = controlPoints[i].position;
-                    lastRotations[i] = controlPoints[i].rotation;
-                }
-            }
-            return;
-        }
-
-        // 检查变化
-        bool changed = false;
-        for (int i = 0; i < controlPoints.Count; i++)
-        {
-            Transform controlPoint = controlPoints[i];
-            if (controlPoint != null)
-            {
-                if (lastPositions[i] != controlPoint.position || 
-                    lastRotations[i] != controlPoint.rotation)
-                {
-                    lastPositions[i] = controlPoint.position;
-                    lastRotations[i] = controlPoint.rotation;
-                    changed = true;
-                }
-            }
-        }
-
-        if (changed)
-        {
-            UpdatePath();
+            if (i > 0) Gizmos.DrawLine(currentPathPoints[i - 1].position, point.position);
+            Gizmos.DrawWireSphere(point.position, gizmoSize * 0.5f);
+            Gizmos.color = tangentColor;
+            Gizmos.DrawRay(point.position, point.tangent * directionLength * 0.5f);
+            Gizmos.color = upDirectionColor;
+            Gizmos.DrawRay(point.position, point.up * directionLength * 0.5f);
         }
     }
 }

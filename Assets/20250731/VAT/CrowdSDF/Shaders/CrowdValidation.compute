@@ -1,0 +1,40 @@
+#pragma kernel Initialize
+#pragma kernel Step
+struct VFXSampler3D { Texture3D t; SamplerState s; };
+float SampleSDF(VFXSampler3D field,float3 uv) {return field.t.SampleLevel(field.s,uv,0).r;}
+#include "CrowdSDF.hlsl"
+Texture3D _Field;
+SamplerState sampler_linear_clamp;
+struct Agent {float3 position;float path;float3 velocity;float phase;float heading;float side;float laps;float minimum;};
+RWStructuredBuffer<Agent> _Agents;
+float3 _Center,_Size,_P0,_P1,_P2,_P3;
+float _Dt,_Radius,_Speed;
+int _Count;
+[numthreads(64,1,1)]
+void Initialize(uint id:SV_DispatchThreadID)
+{
+    if(id>=(uint)_Count)return;
+    VFXSampler3D field;field.t=_Field;field.s=sampler_linear_clamp;
+    Agent a=(Agent)0;
+    a.path=CrowdHash(id+29u)*0.9;
+    a.position=CrowdBezier(a.path,_P0,_P1,_P2,_P3);a.position.y=0;
+    for(int attempt=0;attempt<64;attempt++){
+        if(CrowdDistance(field,a.position+float3(0,.9,0),_Center,_Size)>_Radius+.2)break;
+        a.path=max(0,a.path-.015);a.position=CrowdBezier(a.path,_P0,_P1,_P2,_P3);a.position.y=0;
+    }
+    a.phase=CrowdHash(id+97u)*10;
+    a.side=CrowdHash(id+193u)>.5?1:-1;
+    a.minimum=10000;
+    _Agents[id]=a;
+}
+[numthreads(64,1,1)]
+void Step(uint id:SV_DispatchThreadID)
+{
+    if(id>=(uint)_Count)return;
+    VFXSampler3D field;field.t=_Field;field.s=sampler_linear_clamp;
+    Agent a=_Agents[id];
+    CrowdStep(field,_Center,_Size,_P0,_P1,_P2,_P3,_Speed,_Radius,2,1.3,6,.9,0,10,30,.3,2,_Dt,id,
+        a.position,a.velocity,a.path,a.phase,a.heading,a.side,a.laps);
+    a.minimum=min(a.minimum,CrowdDistance(field,a.position+float3(0,.9,0),_Center,_Size));
+    _Agents[id]=a;
+}

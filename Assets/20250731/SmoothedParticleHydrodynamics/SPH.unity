@@ -393,18 +393,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   initlaVelocity: {x: 0, y: 5}
   numParticles: 900
-  integrationMethod: 1
-  timeStep: 0.02
+  integrationMethod: 0
+  timeStep: 0.002
+  maxSubstepsPerFrame: 64
+  dampingRate: 0
   kernelRadius: 0.8
   restDensity: 4
   stiffness: 2000
   viscosity: 2
   particleMass: 0.4
+  particleSpacingRatio: 0.5
+  autoCalibrateMass: 1
   enableSurfaceTension: 1
   enableSurfaceVisualization: 1
   enableNormalVisualization: 0
   surfaceTensionCoefficient: 0.1
-  surfaceThreshold: 3.5
+  surfaceThreshold: 0.5
   boundaryDamping: 0.841
   boundaryFriction: 0.084
   boundColor: {r: 1, g: 0.16339263, b: 0, a: 1}

@@ -1,103 +1,142 @@
-using System;
 using UnityEngine;
 using UnityEngine.Playables;
+using UnityEngine.SceneManagement;
 
 public class FogMixer : PlayableBehaviour
 {
-    // 保存原始雾设置以便还原
-    private bool originalFogEnabled;
-    private Color originalFogColor;
-    private FogMode originalFogMode;
-    private float originalStartDistance;
-    private float originalEndDistance;
-    private float originalDensity;
-
-    public override void OnGraphStart(Playable playable)
-    {
-        // 保存原始雾设置
-        originalFogEnabled = RenderSettings.fog;
-        originalFogColor = RenderSettings.fogColor;
-        originalFogMode = RenderSettings.fogMode;
-        originalStartDistance = RenderSettings.fogStartDistance;
-        originalEndDistance = RenderSettings.fogEndDistance;
-        originalDensity = RenderSettings.fogDensity;
-    }
+    // RenderSettings is global to the active scene. Only one mixer may own it at a time.
+    private static FogMixer owner;
+    private bool warnedAboutConflict;
+    private FogSnapshot original;
+    private Scene capturedScene;
+    public FogTrack Track { get; set; }
+    public static bool IsControllingFog => owner != null;
 
     public override void ProcessFrame(Playable playable, FrameData info, object playerData)
     {
-        // 启用雾效果
-        RenderSettings.fog = true;
-
-        // 初始化混合变量
-        Color blendedColor = Color.clear;
-        float blendedStartDistance = 0f;
-        float blendedEndDistance = 0f;
-        float blendedDensity = 0f;
-        float totalWeight = 0f;
-        bool hasFogClips = false;
-
-        // 处理所有输入剪辑
-        int inputCount = playable.GetInputCount();
-        for (int i = 0; i < inputCount; i++)
+        Color color = Color.clear;
+        float start = 0f, end = 0f, density = 0f, total = 0f;
+        for (int i = 0; i < playable.GetInputCount(); i++)
         {
             float weight = playable.GetInputWeight(i);
-            if (weight > 0f)
-            {
-                ScriptPlayable<FogBehaviour> inputPlayable = (ScriptPlayable<FogBehaviour>)playable.GetInput(i);
-                FogBehaviour behaviour = inputPlayable.GetBehaviour();
-
-                // 累加颜色（对所有雾类型都通用）
-                blendedColor += behaviour.fogColor * weight;
-
-                // 累加所有雾参数，稍后根据RenderSettings的fogMode决定使用哪个
-                blendedStartDistance += behaviour.fogStartDistance * weight;
-                blendedEndDistance += behaviour.fogEndDistance * weight;
-                blendedDensity += behaviour.fogDensity * weight;
-
-                totalWeight += weight;
-                hasFogClips = true;
-            }
+            if (weight <= 0f) continue;
+            var input = (ScriptPlayable<FogBehaviour>)playable.GetInput(i);
+            var value = input.GetBehaviour();
+            color += value.fogColor * weight;
+            start += Mathf.Max(0f, value.fogStartDistance) * weight;
+            end += Mathf.Max(value.fogStartDistance + 0.01f, value.fogEndDistance) * weight;
+            density += Mathf.Max(0f, value.fogDensity) * weight;
+            total += weight;
         }
 
-        // 如果有活动的雾剪辑，应用混合结果
-        if (hasFogClips && totalWeight > 0f)
+        if (total <= 0f)
         {
-            // 应用混合颜色
-            RenderSettings.fogColor = blendedColor / totalWeight;
+            Release();
+            return;
+        }
 
-            // 根据当前RenderSettings中的雾模式应用相应参数
-            switch (RenderSettings.fogMode)
+        if (owner != null && owner.capturedScene != SceneManager.GetActiveScene()) owner.Release();
+        if (owner != null && owner != this)
+        {
+            if (!warnedAboutConflict)
             {
-                case FogMode.Linear:
-                    RenderSettings.fogStartDistance = blendedStartDistance / totalWeight;
-                    RenderSettings.fogEndDistance = blendedEndDistance / totalWeight;
-                    break;
-                case FogMode.Exponential:
-                case FogMode.ExponentialSquared:
-                    RenderSettings.fogDensity = blendedDensity / totalWeight;
-                    break;
+                Debug.LogWarning("多条 Fog Track 正在同时控制全局雾。当前轨道暂不写入，请错开片段或只保留一条 Fog Track。", Track);
+                warnedAboutConflict = true;
             }
+            return;
+        }
+
+        if (owner == null)
+        {
+            // Capture before the first write, including manual Evaluate while not playing.
+            original = FogSnapshot.Capture();
+            capturedScene = SceneManager.GetActiveScene();
+            owner = this;
+        }
+
+        FogMode mode = Track != null ? Track.ResolveMode(original.mode) : original.mode;
+        FogSnapshot target = new FogSnapshot
+        {
+            enabled = true, mode = mode, color = color / total,
+            start = start / total, end = end / total, density = density / total
+        };
+        Blend(original, target, Mathf.Clamp01(total)).Apply();
+    }
+
+    // A pause stops graph playback too. Keep the evaluated frame until the graph is destroyed.
+    public override void OnPlayableDestroy(Playable playable) => Release();
+
+    public static void RestoreActivePreview()
+    {
+        if (owner != null) owner.Release();
+    }
+
+    private void Release()
+    {
+        if (owner != this) return;
+        owner = null;
+        if (!capturedScene.IsValid() || !capturedScene.isLoaded) return;
+        Scene active = SceneManager.GetActiveScene();
+        // Restore the captured scene, never accidentally write its settings into a new scene.
+        if (active == capturedScene)
+        {
+            original.Apply();
+            return;
+        }
+        if (!SceneManager.SetActiveScene(capturedScene)) return;
+        try { original.Apply(); }
+        finally
+        {
+            if (active.IsValid() && active.isLoaded) SceneManager.SetActiveScene(active);
+        }
+    }
+
+    public static FogSnapshot Blend(FogSnapshot baseline, FogSnapshot target, float weight)
+    {
+        weight = Mathf.Clamp01(weight);
+        if (weight <= 0f) return baseline;
+        if (weight >= 1f) return target;
+        var result = target;
+        if (baseline.enabled)
+        {
+            result.color = Color.Lerp(baseline.color, target.color, weight);
+            result.start = Mathf.Lerp(baseline.start, target.start, weight);
+            result.end = Mathf.Max(result.start + 0.01f, Mathf.Lerp(baseline.end, target.end, weight));
+            result.density = Mathf.Lerp(baseline.density, target.density, weight);
         }
         else
         {
-            // 没有活动剪辑时还原原始设置
-            ResetFogSettings();
+            // Do not blend with the irrelevant color/density of disabled scene fog.
+            // Built-in linear fog has no intensity: expanding its range approaches no fog
+            // at every finite distance as weight approaches zero.
+            result.end = target.start + Mathf.Max(0.01f, target.end - target.start) / weight;
+            result.density = target.density * (target.mode == FogMode.ExponentialSquared ? Mathf.Sqrt(weight) : weight);
         }
+        return result;
     }
 
-    public override void OnGraphStop(Playable playable)
+    public struct FogSnapshot
     {
-        // 还原原始雾设置
-        ResetFogSettings();
-    }
+        public bool enabled;
+        public Color color;
+        public FogMode mode;
+        public float start, end, density;
 
-    private void ResetFogSettings()
-    {
-        RenderSettings.fog = originalFogEnabled;
-        RenderSettings.fogColor = originalFogColor;
-        RenderSettings.fogMode = originalFogMode;
-        RenderSettings.fogStartDistance = originalStartDistance;
-        RenderSettings.fogEndDistance = originalEndDistance;
-        RenderSettings.fogDensity = originalDensity;
+        public static FogSnapshot Capture() => new FogSnapshot
+        {
+            enabled = RenderSettings.fog, color = RenderSettings.fogColor,
+            mode = RenderSettings.fogMode, start = RenderSettings.fogStartDistance,
+            end = RenderSettings.fogEndDistance, density = RenderSettings.fogDensity
+        };
+
+        public void Apply()
+        {
+            RenderSettings.fogColor = color;
+            RenderSettings.fogMode = mode;
+            RenderSettings.fogStartDistance = start;
+            RenderSettings.fogEndDistance = end;
+            RenderSettings.fogDensity = density;
+            RenderSettings.fog = enabled;
+        }
     }
 }

@@ -1,10 +1,5 @@
 Shader "Hidden/SphereFog"
 {
-    Properties
-    {
-        _NoiseTex ("Noise Texture", 2D) = "white" {}
-    }
-
     SubShader
     {
         Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" }
@@ -23,8 +18,6 @@ Shader "Hidden/SphereFog"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "SphereFogInclude.hlsl"
 
-            TEXTURE2D(_NoiseTex);
-            SAMPLER(sampler_NoiseTex);
 
             CBUFFER_START(UnityPerMaterial)
                 float  _FogShape;        // 0 = Sphere, 1 = Box
@@ -39,9 +32,6 @@ Shader "Hidden/SphereFog"
                 float  _Smoothness;
                 float  _Density;
                 float4 _FogColor;
-                float  _NoiseScale;
-                float  _NoiseStrength;
-                float3 _NoiseSpeed;
                 float  _SkyFogAmount;
             CBUFFER_END
 
@@ -83,20 +73,6 @@ Shader "Hidden/SphereFog"
                 }
             }
 
-            // ---------- Noise ----------
-
-            float SampleTriplanarNoise(float3 pos, float3 timeOffset)
-            {
-                float3 p = pos * _NoiseScale + timeOffset;
-                float nx = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, p.yz).r;
-                float ny = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, p.xz).r;
-                float nz = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, p.xy).r;
-
-                float3 w = abs(normalize(pos + 1e-5));
-                w /= (w.x + w.y + w.z);
-                return nx * w.x + ny * w.y + nz * w.z;
-            }
-
             // ---------- Fragment ----------
 
             half4 Frag(Varyings input) : SV_Target
@@ -112,11 +88,6 @@ Shader "Hidden/SphereFog"
 
                 // SDF：负=体积内(清晰)，正=体积外(起雾)
                 float sdf = ComputeSDF(worldPos);
-
-                // 噪声扰动 SDF 边界
-                float3 dir = normalize(worldPos - _FogCenter + 1e-5);
-                float  n   = SampleTriplanarNoise(dir * 5.0, _Time.y * _NoiseSpeed);
-                sdf -= (n - 0.5) * 2.0 * _NoiseStrength;
 
                 // 平滑过渡：sdf 从 -s/2 到 +s/2 之间线性过渡
                 float halfS = max(_Smoothness * 0.5, 1e-4);

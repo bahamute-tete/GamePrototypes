@@ -1,0 +1,14 @@
+30 FPS / 120 simulated seconds: minimum clearance=0.6314, invalid/ground violations=0, agents completing a lap=50/50, total laps=179, dispatch+readback wall time=137.2 ms (NOT render frame time)
+Final path range=0.0025..0.9849992
+60 FPS / 120 simulated seconds: minimum clearance=0.6256, invalid/ground violations=0, agents completing a lap=50/50, total laps=179, dispatch+readback wall time=86.2 ms (NOT render frame time)
+Final path range=0.0025..0.9849992
+Both rates must complete every agent's route; positions need not match after repeated respawns.
+West wall head-on: minimum clearance=0.4824, ground=0 PASS
+Corner diagonal: minimum clearance=0.5000, ground=0 PASS
+Column head-on: minimum clearance=0.4828, ground=0 PASS
+East wall oblique: minimum clearance=0.4824, ground=0 PASS
+Stopped animation: PASS
+
+SDF Play Mode: 120.0 s, sampled distinct frames=15035, mean Unity unscaled frame=7.65 ms. Includes Editor overhead; not isolated GPU timing.
+
+Original Play Mode: 20.0 s, sampled distinct frames=1574, mean Unity unscaled frame=9.53 ms. Includes Editor overhead; not isolated GPU timing.

@@ -208,8 +208,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 86623736}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.23701425, y: -0, z: -0, w: 0.97150624}
-  m_LocalPosition: {x: 0, y: 1.443, z: -1.358}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.28, z: 0.06}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -239,7 +239,7 @@ MonoBehaviour:
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
   m_RenderPostProcessing: 1
-  m_Antialiasing: 1
+  m_Antialiasing: 2
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 1
@@ -323,7 +323,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   visualEffect: {fileID: 1767980198}
-  splatData: {fileID: 11400000, guid: 029f912fb21e4154a8fe34d95e9aa84c, type: 2}
+  splatData: {fileID: 11400000, guid: 44d52b66b815d194694b6556370321c9, type: 2}
   computeShader: {fileID: 7200000, guid: 44ceb37bd2cdd19479520dce185fb6bf, type: 3}
   targetCamera: {fileID: 0}
   useAudioSpectrum: 0
@@ -357,7 +357,7 @@ Light:
   m_Type: 1
   m_Shape: 0
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 2
+  m_Intensity: 25.24
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208

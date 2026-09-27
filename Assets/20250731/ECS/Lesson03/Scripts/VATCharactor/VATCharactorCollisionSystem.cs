@@ -24,12 +24,15 @@ partial struct VATCharactorCollisionSystem : ISystem
 
     public void OnUpdate(ref SystemState state)
     {
+
+        
         var collisionJob = new VATCharactorCollisionJob
         {
             //CollisionQueue = m_VatCollisionEntities.AsParallelWriter(),
             dynamicBodies = SystemAPI.GetComponentLookup<PhysicsVelocity>(true),//用物理组件识别角色,动态角色有 PhysicsVelocity，静态地面没有
             landTags = SystemAPI.GetComponentLookup<HasLandedTag>(),
             landingReactionTags = SystemAPI.GetComponentLookup<LandingReactionTag>(),
+            groundTags = SystemAPI.GetComponentLookup<PhysicsGroundTag>(),
         };
        state.Dependency = collisionJob.Schedule(SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency);
 
@@ -67,6 +70,11 @@ public struct VATCharactorCollisionJob : ICollisionEventsJob
     public ComponentLookup<HasLandedTag> landTags;
     public ComponentLookup<LandingReactionTag> landingReactionTags;
 
+    [ReadOnly]
+    public ComponentLookup<PhysicsGroundTag> groundTags;
+
+
+
     public void Execute(CollisionEvent collisionEvent)
     {
         var entityA = collisionEvent.EntityA;
@@ -82,19 +90,22 @@ public struct VATCharactorCollisionJob : ICollisionEventsJob
         //    CollisionQueue.Enqueue(entityB);
         //}
 
-        TryMarkLanded(entityA);
-        TryMarkLanded(entityB);
+        TryMarkLanded(entityA, entityB, collisionEvent.Normal);
+        TryMarkLanded(entityB, entityA, -collisionEvent.Normal);
 
 
     }
 
-    private void TryMarkLanded(Entity entity)
+    private void TryMarkLanded(Entity entity,Entity otherEntity,float3 groundToCharacterNormal)
     {
         if (!dynamicBodies.HasComponent(entity) || 
+            !groundTags.HasComponent(otherEntity) ||
             !landTags.HasComponent(entity) || 
             !landingReactionTags.HasComponent(entity)||
             landTags.IsComponentEnabled(entity) || 
-            landingReactionTags.IsComponentEnabled(entity))
+            landingReactionTags.IsComponentEnabled(entity)||
+            //地面朝向角色的法线必须明显向上可接受最高约 60° 的斜坡；
+            groundToCharacterNormal.y <= 0.5)
         { 
             return ;
         }

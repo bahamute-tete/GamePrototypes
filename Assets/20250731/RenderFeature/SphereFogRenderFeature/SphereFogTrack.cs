@@ -29,9 +29,8 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
 
     // 原始值缓存,OnPlayableDestroy 时还原
     bool    _hasOrig;
-    float   _oSmooth, _oDensity, _oSkyDist, _oNoiseScale, _oNoiseStrength;
+    float   _oSmooth, _oDensity, _oSkyDist;
     Color   _oFogColor;
-    Vector3 _oNoiseSpeed;
     Vector3 _oPos, _oRot, _oScale;
 
     public override void ProcessFrame(Playable playable, FrameData info, object playerData)
@@ -47,9 +46,6 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
             _oDensity       = volume.density;
             _oFogColor      = volume.fogColor;
             _oSkyDist       = volume.skyDistance;
-            _oNoiseScale    = volume.noiseScale;
-            _oNoiseStrength = volume.noiseStrength;
-            _oNoiseSpeed    = volume.noiseSpeed;
 
             var t = volume.transform;
             _oPos   = t.position;
@@ -64,9 +60,7 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
         float weightSum  = 0f;
 
         float   density = 0f, smoothness = 0f, skyDist = 0f;
-        float   noiseScale = 0f, noiseStrength = 0f;
         Color   fogColor = Color.clear;
-        Vector3 noiseSpeed = Vector3.zero;
 
         float   transformWeight = 0f;
         Vector3 position = Vector3.zero, rotationEuler = Vector3.zero, scale = Vector3.zero;
@@ -84,9 +78,6 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
             smoothness    += b.smoothness    * w;
             fogColor      += b.fogColor      * w;
             skyDist       += b.skyDistance   * w;
-            noiseScale    += b.noiseScale    * w;
-            noiseStrength += b.noiseStrength * w;
-            noiseSpeed    += b.noiseSpeed    * w;
 
             if (b.driveTransform)
             {
@@ -107,9 +98,6 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
         volume.density       = density;
         volume.fogColor      = fogColor;
         volume.skyDistance   = skyDist;
-        volume.noiseScale    = noiseScale;
-        volume.noiseStrength = noiseStrength;
-        volume.noiseSpeed    = noiseSpeed;
 
         // ===== 写入 Transform (只有当至少一个 active clip 勾了 driveTransform) =====
         if (transformWeight > 0.001f)
@@ -132,9 +120,6 @@ public class SphereFogMixerBehaviour : PlayableBehaviour
             _cached.density       = _oDensity;
             _cached.fogColor      = _oFogColor;
             _cached.skyDistance   = _oSkyDist;
-            _cached.noiseScale    = _oNoiseScale;
-            _cached.noiseStrength = _oNoiseStrength;
-            _cached.noiseSpeed    = _oNoiseSpeed;
 
             var t = _cached.transform;
             t.position    = _oPos;

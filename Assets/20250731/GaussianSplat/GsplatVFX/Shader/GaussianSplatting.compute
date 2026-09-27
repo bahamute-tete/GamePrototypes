@@ -31,12 +31,12 @@
 // -----------------------------------------------------------------------------
 // 可调常量
 // -----------------------------------------------------------------------------
-// 高斯从中心到 quad 边界对应的 σ 倍数。3.0 对应 ~99.7% 能量截断，
-// 也和 Shader Graph 中 exp(-(6·(uv-0.5))²) 在 uv 边缘 r=3 的设定一致。
+// 高斯从中心到 quad 边界对应的 σ 倍数。3.0 对应二维 3σ 圆内约 98.9% 能量，
+// 也和 Shader Graph 中 exp(-0.5 * dot(6*(uv-0.5), 6*(uv-0.5))) 在 uv 边缘 r=3 的设定一致。
 #define SIZE_CUTOFF_SIGMAS  3.0
 
 // 屏幕空间各向同性低通项。给 Σ_screen 加 0.3·I 后，最小投影半径约为 √0.3 ≈ 0.55 px，
-// 避免亚像素 splat 闪烁/消失。INRIA / Mip-Splatting 的标准取值。
+// 避免亚像素 splat 闪烁/消失。经典 3DGS 低通取值（不等同完整 Mip-Splatting）。
 #define SCREEN_AA_FILTER    0.3
 
 // 小特征值 λ₂ 的像素级下限（单位：px²）。
@@ -58,9 +58,10 @@ RWStructuredBuffer<float4> _OutputTransformBuffer;
 // 每帧 Uniform
 // -----------------------------------------------------------------------------
 float4x4 _ViewMatrix;        // camera.worldToCameraMatrix
-float4x4 _ProjectionMatrix;  // GL.GetGPUProjectionMatrix(camera.projectionMatrix, false)
+float4x4 _ProjectionMatrix;  // camera.projectionMatrix; camera-plane convention for VFX billboards
 float2   _ScreenSize;        // (pixelWidth, pixelHeight)
 float    _NearPlane;         // camera.nearClipPlane —— 用于背后剔除
+int      _IsOrthographic;   // 0: perspective, 1: orthographic
 int      _Count;             // splat 总数
 
 
@@ -73,6 +74,8 @@ int      _Count;             // splat 总数
 // =============================================================================
 float3x3 ComputeCovariance3D(float3 scale, float4 q)
 {
+    float qLengthSq = dot(q, q);
+    q = qLengthSq > 1e-12 ? q * rsqrt(qLengthSq) : float4(0, 0, 0, 1);
     float x = q.x, y = q.y, z = q.z, w = q.w;
 
     // 四元数 → 旋转矩阵（列向量约定）
@@ -100,30 +103,31 @@ float3x3 ComputeCovariance3D(float3 scale, float4 q)
 //             pixel.x = (NDC.x · 0.5 + 0.5) · screenW
 //
 // 对 view 空间分量取偏导，得到 2x3 的 J：
-//   ∂pixel.x/∂view = ( fx·hW/depth,   0,   -fx·hW·view.x/depth² )
-//   ∂pixel.y/∂view = ( 0,   fy·hH/depth,   -fy·hH·view.y/depth² )
+//   ∂pixel.x/∂view = ( fx·hW/depth,   0,   +fx·hW·view.x/depth² )
+//   ∂pixel.y/∂view = ( 0,   fy·hH/depth,   +fy·hH·view.y/depth² )
 //
 // 为防止 splat 接近视锥边缘时投影非线性误差过大（视觉上表现为拉成长条），
 // 把用于线性化的点 t.xy 限制在 1.3 倍视锥范围内（INRIA 原版做法）。
 // =============================================================================
 float2x3 ComputeProjectionJacobian(float3 t, float fx, float fy, float2 screenSize)
 {
-    float z = max(-t.z, 0.001);   // 防 0
-
-    float limX = 1.3 * z / fx;
-    float limY = 1.3 * z / fy;
-    t.x = clamp(t.x, -limX, limX);
-    t.y = clamp(t.y, -limY, limY);
-
-    float invZ  = 1.0 / z;
-    float invZ2 = invZ * invZ;
-
     float halfW = 0.5 * screenSize.x;
     float halfH = 0.5 * screenSize.y;
+    if (_IsOrthographic != 0)
+        return float2x3(fx * halfW, 0.0, 0.0, 0.0, fy * halfH, 0.0);
 
+    float depth = max(-t.z, 0.001);
+    float limX = 1.3 * depth / max(abs(fx), 1e-6);
+    float limY = 1.3 * depth / max(abs(fy), 1e-6);
+    t.x = clamp(t.x, -limX, limX);
+    t.y = clamp(t.y, -limY, limY);
+    float invZ = rcp(depth);
+    float invZ2 = invZ * invZ;
+
+    // depth = -view.z: differentiating x/depth with respect to view.z is positive.
     return float2x3(
-        fx * halfW * invZ,   0.0,                 -fx * halfW * t.x * invZ2,
-        0.0,                 fy * halfH * invZ,   -fy * halfH * t.y * invZ2
+        fx * halfW * invZ, 0.0, +fx * halfW * t.x * invZ2,
+        0.0, fy * halfH * invZ, +fy * halfH * t.y * invZ2
     );
 }
 
@@ -157,30 +161,19 @@ float2x2 ProjectCovarianceToScreen(float3x3 sigmaWorld, float3 viewPos,
 void EigenDecomposeSymmetric2x2(float2x2 cov, out float2 lambda, out float2x2 U)
 {
     float a = cov[0][0];
-    float b = cov[0][1];
+    float b = 0.5 * (cov[0][1] + cov[1][0]);
     float d = cov[1][1];
+    float mid = 0.5 * (a + d);
+    float halfDiff = 0.5 * (a - d);
+    float radius = length(float2(halfDiff, b));
+    lambda = float2(mid + radius, mid - radius);
 
-    float trace = a + d;
-    float det   = a * d - b * b;
-    float disc  = sqrt(max(0.0, 0.25 * trace * trace - det));
-
-    lambda.x = 0.5 * trace + disc;   // 大特征值
-    lambda.y = 0.5 * trace - disc;   // 小特征值
-
-    if (abs(b) > 1e-5)
-    {
-        // v1 取与 (b, λ_大 - a) 同向的单位向量；v2 是其逆时针 90° 旋转
-        float2 v1 = normalize(float2(b, lambda.x - a));
-        float2 v2 = float2(-v1.y, v1.x);
-        U = float2x2(v1.x, v2.x,
-                     v1.y, v2.y);
-    }
-    else
-    {
-        // 已经对角：按特征值大小决定轴顺序
-        if (a >= d) U = float2x2(1, 0,  0, 1);
-        else        U = float2x2(0, 1,  1, 0);
-    }
+    // This only suppresses the undefined direction of a nearly circular Gaussian.
+    float angle = radius > 1e-6 * max(abs(mid), 1e-10)
+        ? 0.5 * atan2(2.0 * b, a - d) : 0.0;
+    float s, c;
+    sincos(angle, s, c);
+    U = float2x2(c, -s, s, c);
 }
 
 
@@ -258,7 +251,7 @@ void ComputeSplatTransform(uint3 id : SV_DispatchThreadID)
     // 由透视投影反推：1 像素 在 depth 处 ≈ (2·depth) / (fy · screenH) 世界单位
     // （fy·screenH 和 fx·screenW 在 Unity 投影矩阵下相等，所以 X/Y 用同一个系数）
     float depth = -viewPos.z;
-    float pixelToWorld = (2.0 * depth) / (fy * _ScreenSize.y);
+    float pixelToWorld = (2.0 * (_IsOrthographic != 0 ? 1.0 : depth)) / max(abs(fy) * _ScreenSize.y, 1e-6);
 
     // 输出 "σ × cutoff" 的世界尺寸（半轴长度）；VFX 端 Set Size = 2 即得完整边长
     float2 halfSizeWorld = sigmaPixels * pixelToWorld * SIZE_CUTOFF_SIGMAS;

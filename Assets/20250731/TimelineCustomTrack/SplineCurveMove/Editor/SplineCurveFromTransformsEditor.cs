@@ -1,10 +1,172 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using System.Linq;
+using UnityEngine.Timeline;
+using UnityEngine.Playables;
+using UnityEditor.Timeline;
 
 [CustomEditor(typeof(SplineCurveFromTransforms))]
 public class SplineCurveFromTransformsEditor : Editor
 {
+    private TimelineClip[] MovementClips(SerializedProperty setting)
+    {
+        var timeline = timelineAssetProp.objectReferenceValue as TimelineAsset;
+        if (timeline == null) return new TimelineClip[0];
+        var tracks = timeline.GetOutputTracks().OfType<SplineCurveMoveTrack>().ToArray();
+        var track = setting.FindPropertyRelative("track").objectReferenceValue as SplineCurveMoveTrack;
+        if (track == null)
+        {
+            var matches = tracks.Where(t => t.name == setting.FindPropertyRelative("trackName").stringValue).ToArray();
+            if (matches.Length == 1) track = matches[0];
+        }
+        return track != null && tracks.Contains(track)
+            ? track.GetClips().Where(c => c.asset is SplineCurveMoveClip).OrderBy(c => c.start).ToArray() : new TimelineClip[0];
+    }
+    private void DrawClipSelector(SerializedProperty setting, SerializedProperty item)
+    {
+        var clips = MovementClips(setting);
+        var reference = item.FindPropertyRelative("clip");
+        var pinned = item.FindPropertyRelative("hasClipBinding");
+        var legacy = item.FindPropertyRelative("clipIndex");
+        var labels = new List<string> { "请选择移动 Clip" };
+        foreach (var clip in clips) labels.Add($"{labels.Count}. {clip.displayName}  ({clip.start:F2}–{clip.end:F2}s)");
+        int selected = System.Array.FindIndex(clips, c => c.asset == reference.objectReferenceValue) + 1;
+        if (selected == 0 && (!pinned.boolValue || reference.objectReferenceValue != null || reference.objectReferenceInstanceIDValue != 0))
+        {
+            labels.Add(!pinned.boolValue ? $"旧索引 {legacy.intValue}（请选择或迁移）" : "原 Clip 已删除或移出轨道，请重新选择");
+            selected = labels.Count - 1;
+        }
+        EditorGUI.BeginChangeCheck();
+        int choice = EditorGUILayout.Popup("绑定移动 Clip", selected, labels.ToArray());
+        if (EditorGUI.EndChangeCheck() && choice <= clips.Length)
+        {
+            reference.objectReferenceValue = choice > 0 ? clips[choice-1].asset : null;
+            pinned.boolValue = true;
+        }
+    }
+    private void DrawClipMigration(SerializedProperty setting, SerializedProperty items)
+    {
+        bool legacy = false;
+        for (int i = 0; i < items.arraySize; i++)
+            legacy |= !items.GetArrayElementAtIndex(i).FindPropertyRelative("hasClipBinding").boolValue;
+        if (!legacy) return;
+        EditorGUILayout.HelpBox("旧索引尚未转换。若原来按移动 Clip 的 0、1、2… 配置，可使用下方按钮忽略过渡 Clip 迁移；如果已手动调整过索引，请逐行选择正确的移动 Clip。迁移后无需再维护编号。", MessageType.Info);
+        if (!GUILayout.Button("迁移旧索引（忽略过渡 Clip）")) return;
+        var clips = MovementClips(setting);
+        var chosen = new HashSet<Object>();
+        for (int i = 0; i < items.arraySize; i++)
+        {
+            var item = items.GetArrayElementAtIndex(i);
+            var clip = item.FindPropertyRelative("clip").objectReferenceValue;
+            if (!item.FindPropertyRelative("hasClipBinding").boolValue && clip == null)
+            {
+                int index = item.FindPropertyRelative("clipIndex").intValue;
+                if (index >= 0 && index < clips.Length) clip = clips[index].asset;
+            }
+            if (clip == null || !chosen.Add(clip))
+            {
+                Debug.LogWarning("旧索引越界或绑定重复，本次未迁移。请逐行选择对应的移动 Clip。", target);
+                return;
+            }
+        }
+        for (int i = 0; i < items.arraySize; i++)
+        {
+            var item = items.GetArrayElementAtIndex(i);
+            if (item.FindPropertyRelative("hasClipBinding").boolValue) continue;
+            var reference = item.FindPropertyRelative("clip");
+            if (reference.objectReferenceValue == null) reference.objectReferenceValue = clips[item.FindPropertyRelative("clipIndex").intValue].asset;
+            item.FindPropertyRelative("hasClipBinding").boolValue = true;
+        }
+    }
+    private PlayableDirector ResolveNamingDirector(TimelineAsset timeline)
+    {
+        if (timeline == null) return null;
+        var inspected = TimelineEditor.inspectedDirector;
+        if (inspected != null && inspected.playableAsset == timeline) return inspected;
+        var local = ((SplineCurveFromTransforms)target).GetComponentInParent<PlayableDirector>();
+        if (local != null && local.playableAsset == timeline) return local;
+        var candidates = Resources.FindObjectsOfTypeAll<PlayableDirector>()
+            .Where(d => !EditorUtility.IsPersistent(d) && d.gameObject.scene.IsValid() && d.playableAsset == timeline).ToArray();
+        return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private static string TrackLabel(SplineCurveMoveTrack track, PlayableDirector director)
+    {
+        var binding = director != null ? director.GetGenericBinding(track) : null;
+        string path = track.name;
+        for (var parent = track.parent as TrackAsset; parent != null; parent = parent.parent as TrackAsset)
+            path = parent.name + " / " + path;
+        return binding != null ? binding.name + "  [" + path + "]" : path + "（未找到绑定物体）";
+    }
+
+    private static void NameTrackAfterBinding(SplineCurveMoveTrack track, PlayableDirector director, TimelineAsset timeline)
+    {
+        var binding = director.GetGenericBinding(track);
+        if (binding == null || track.name == binding.name) return;
+        // Preserve old scene mappings before the shared TrackAsset changes its name.
+        foreach (var author in Resources.FindObjectsOfTypeAll<SplineCurveFromTransforms>())
+        {
+            if (EditorUtility.IsPersistent(author) || !author.gameObject.scene.IsValid() || author.timelineAsset != timeline) continue;
+            var settings = author.settings.Where(s => s != null && s.track == null && author.ResolveTrack(s) == track).ToArray();
+            if (settings.Length == 0) continue;
+            Undo.RecordObject(author, "Migrate track binding");
+            foreach (var setting in settings) { setting.track = track; setting.trackName = ""; }
+            PrefabUtility.RecordPrefabInstancePropertyModifications(author);
+            EditorUtility.SetDirty(author);
+        }
+        Undo.RecordObject(track, "Name track after bound object");
+        track.name = binding.name;
+        EditorUtility.SetDirty(track);
+        TimelineEditor.Refresh(RefreshReason.ContentsModified);
+    }
+
+    private void DrawTrackSelector(SerializedProperty setting)
+    {
+        var reference = setting.FindPropertyRelative("track");
+        var legacy = setting.FindPropertyRelative("trackName");
+        var timeline = timelineAssetProp.objectReferenceValue as TimelineAsset;
+        var director = ResolveNamingDirector(timeline);
+        var tracks = timeline == null ? new List<SplineCurveMoveTrack>() : timeline.GetOutputTracks().OfType<SplineCurveMoveTrack>().ToList();
+        // Migrate only an unambiguous old name, using SerializedProperty so Undo and prefab overrides work.
+        if (reference.objectReferenceValue == null && !string.IsNullOrEmpty(legacy.stringValue))
+        {
+            var matches = tracks.Where(t => t.name == legacy.stringValue).ToList();
+            if (matches.Count == 1) { reference.objectReferenceValue = matches[0]; legacy.stringValue = ""; }
+        }
+        var labels = new List<string> { "请选择移动轨道" };
+        foreach (var track in tracks)
+        {
+            labels.Add($"{labels.Count}. {TrackLabel(track, director)}");
+        }
+        int selected = tracks.IndexOf(reference.objectReferenceValue as SplineCurveMoveTrack) + 1;
+        if (selected == 0 && (reference.objectReferenceValue != null || !string.IsNullOrEmpty(legacy.stringValue)))
+        {
+            labels.Add("旧绑定未找到或不属于当前 Timeline，请重新选择");
+            selected = labels.Count - 1;
+        }
+        EditorGUI.BeginChangeCheck();
+        int choice = EditorGUILayout.Popup("绑定轨道", selected, labels.ToArray());
+        if (EditorGUI.EndChangeCheck() && choice <= tracks.Count)
+        {
+            reference.objectReferenceValue = choice == 0 ? null : tracks[choice - 1];
+            legacy.stringValue = "";
+        }
+        if (tracks.Count == 0) EditorGUILayout.HelpBox("请先指定 Timeline，并在其中创建 Spline Curve Move Track。", MessageType.Info);
+        var selectedTrack = reference.objectReferenceValue as SplineCurveMoveTrack;
+        using (new EditorGUI.DisabledScope(director == null || selectedTrack == null || !tracks.Contains(selectedTrack) || director.GetGenericBinding(selectedTrack) == null))
+        {
+            if (GUILayout.Button("用绑定物体名命名此轨道"))
+            {
+                serializedObject.ApplyModifiedProperties();
+                NameTrackAfterBinding(selectedTrack, director, timeline);
+                serializedObject.Update();
+            }
+        }
+        if (tracks.Count > 0 && director == null)
+            EditorGUILayout.HelpBox("请在 Timeline 窗口打开对应的场景 Director，以显示绑定物体名。", MessageType.Info);
+    }
+
     private SerializedProperty timelineAssetProp;
     private SerializedProperty bakeAtTimelineStartProp;  // Phase 4 hotfix
     private SerializedProperty autoBakeOnPlayProp;       // UX 优化
@@ -166,8 +328,9 @@ public class SplineCurveFromTransformsEditor : Editor
 
                 EditorGUILayout.BeginHorizontal();
                 SerializedProperty trackNameProp = settingProp.FindPropertyRelative("trackName");
-                string trackName = trackNameProp.stringValue;
-                string settingTitle = string.IsNullOrEmpty(trackName) ? $"TrackName: {i + 1}" : $"TrackName: {trackName}";
+                var boundTrack = settingProp.FindPropertyRelative("track").objectReferenceValue as SplineCurveMoveTrack;
+                string trackName = boundTrack != null ? TrackLabel(boundTrack, ResolveNamingDirector(timelineAssetProp.objectReferenceValue as TimelineAsset)) : trackNameProp.stringValue;
+                string settingTitle = string.IsNullOrEmpty(trackName) ? $"曲线设置 {i + 1}" : $"轨道: {trackName}";
                 settingsFoldouts[i] = EditorGUILayout.Foldout(settingsFoldouts[i], settingTitle, true, EditorStyles.foldoutHeader);
                 GUI.backgroundColor = new Color(1.0f, 0.3f, 0.0f);
                 if (GUILayout.Button("Delete", GUILayout.Width(60)))
@@ -187,13 +350,14 @@ public class SplineCurveFromTransformsEditor : Editor
                 if (settingsFoldouts[i])
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(trackNameProp, new GUIContent("TrackName"));
+                    DrawTrackSelector(settingProp);
 
                     // ============================================ //
                     // Rotation Config
                     // ============================================ //
                     EditorGUILayout.BeginVertical(GUI.skin.box);
                     EditorGUILayout.LabelField("Rotation Config", EditorStyles.boldLabel);
+                    EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("visualRotationOffset"), new GUIContent("Rotation Offset"));
 
                     SerializedProperty alphaModeProp = settingProp.FindPropertyRelative("alphaMode");
                     if (alphaModeProp != null)
@@ -204,30 +368,33 @@ public class SplineCurveFromTransformsEditor : Editor
                         EditorGUILayout.PropertyField(rotationModeProp, new GUIContent("Rotation Mode"));
 
                     SerializedProperty useKeyRotProp = settingProp.FindPropertyRelative("useKeypointRotation");
-                    if (useKeyRotProp != null)
-                        EditorGUILayout.PropertyField(useKeyRotProp, new GUIContent("Use Keypoint Rotation"));
+                    bool usesRoll = rotationModeProp != null &&
+                        rotationModeProp.intValue == (int)CatmullRomSpline.RotationMode.TangentWithRoll;
+                    if (usesRoll && useKeyRotProp != null)
+                        EditorGUILayout.PropertyField(useKeyRotProp, new GUIContent("Use Control Point Roll",
+                            "仅提取控制点旋转中的 Roll；前进方向始终由路径切线决定。"));
 
                     SerializedProperty rotKeyModeProp = settingProp.FindPropertyRelative("rotationKeyframeMode");
-                    if (rotKeyModeProp != null && (useKeyRotProp == null || useKeyRotProp.boolValue))
+                    if (usesRoll && rotKeyModeProp != null && (useKeyRotProp == null || useKeyRotProp.boolValue))
                     {
-                        EditorGUILayout.PropertyField(rotKeyModeProp, new GUIContent("Keyframe Mode"));
+                        EditorGUILayout.PropertyField(rotKeyModeProp, new GUIContent("Roll Key Mode"));
 
                         var mode = (RotationKeyframeMode)rotKeyModeProp.enumValueIndex;
                         switch (mode)
                         {
                             case RotationKeyframeMode.EveryPoint:
                                 EditorGUILayout.HelpBox(
-                                    "EveryPoint：每个关键点都使用自身的 rotation。",
+                                    "EveryPoint：每个控制点的旋转都用于提供 Roll。",
                                     MessageType.None);
                                 break;
                             case RotationKeyframeMode.EndpointsOnly:
                                 EditorGUILayout.HelpBox(
-                                    "EndpointsOnly：只使用首尾两点的 rotation，中间点按序号比例 Slerp 自动过渡。",
+                                    "EndpointsOnly：由首尾两点旋转插值得到 Roll 参考，朝向仍沿切线。",
                                     MessageType.Info);
                                 break;
                             case RotationKeyframeMode.MarkedKeyframes:
                                 EditorGUILayout.HelpBox(
-                                    "MarkedKeyframes：只有勾选 IsKey 的点的 rotation 起作用。\n" +
+                                    "MarkedKeyframes：勾选 IsKey 的点提供 Roll 参考。\n" +
                                     "• 第一个 key 之前的点：clamp 用第一个 key 的 rotation\n" +
                                     "• 最后一个 key 之后的点：clamp 用最后一个 key 的 rotation\n" +
                                     "• 不勾任何点时：自动 fallback 到 EndpointsOnly 行为",
@@ -271,6 +438,8 @@ public class SplineCurveFromTransformsEditor : Editor
                         splineCurveParametersPerClip.arraySize++;
                         var newItem = splineCurveParametersPerClip.GetArrayElementAtIndex(splineCurveParametersPerClip.arraySize - 1);
                         newItem.FindPropertyRelative("clipIndex").intValue = splineCurveParametersPerClip.arraySize - 1;
+                        newItem.FindPropertyRelative("clip").objectReferenceValue = null;
+                        newItem.FindPropertyRelative("hasClipBinding").boolValue = true;
                         splineCurveParametersPerClipFoldouts[i] = true;
                     }
                     GUI.backgroundColor = Color.white;
@@ -279,6 +448,7 @@ public class SplineCurveFromTransformsEditor : Editor
 
                     if (splineCurveParametersPerClipFoldouts[i])
                     {
+                        DrawClipMigration(settingProp, splineCurveParametersPerClip);
                         EditorGUI.indentLevel++;
 
                         bool showIsKey = false;
@@ -292,17 +462,15 @@ public class SplineCurveFromTransformsEditor : Editor
                             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
                             SerializedProperty clipProp = splineCurveParametersPerClip.GetArrayElementAtIndex(j);
-                            SerializedProperty clipIndexProp = clipProp.FindPropertyRelative("clipIndex");
+
                             SerializedProperty clipcontrolPointsProp = clipProp.FindPropertyRelative("controlPointsTransforms");
-                            SerializedProperty resamplePointsProp = clipProp.FindPropertyRelative("resamplePoints");
                             SerializedProperty keyFlagsProp = clipProp.FindPropertyRelative("rotationKeyFlags");
                             
 
                             SyncKeyFlagsLengthSerialized(keyFlagsProp, clipcontrolPointsProp.arraySize);
 
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField($"Clip_{clipIndexProp.intValue}", EditorStyles.boldLabel, GUILayout.Width(100));
-                            EditorGUILayout.PropertyField(clipIndexProp, GUIContent.none);
+                            DrawClipSelector(settingProp, clipProp);
                             GUILayout.FlexibleSpace();
                             GUI.backgroundColor = new Color(1.0f, 0.3f, 0.0f);
                             if (GUILayout.Button("Delete", GUILayout.Width(60)))
@@ -358,7 +526,7 @@ public class SplineCurveFromTransformsEditor : Editor
                                 if (added > 0)
                                 {
                                     keyFlagsProp.arraySize = clipcontrolPointsProp.arraySize;
-                                    Debug.Log($"[Spline] Added {added} control point(s) to Clip_{clipIndexProp.intValue}");
+                                    Debug.Log($"[Spline] Added {added} control point(s) to control-point group {j + 1}");
                                 }
                             }
                             GUI.backgroundColor = Color.white;
@@ -430,6 +598,7 @@ public class SplineCurveFromTransformsEditor : Editor
 
                             EditorGUILayout.BeginVertical(GUI.skin.box);
                             GUI.backgroundColor = new Color(0.3799198f, 0.9716981f, 0.2077844f);
+                            SerializedProperty resamplePointsProp = clipProp.FindPropertyRelative("resamplePoints");
                             EditorGUILayout.PropertyField(resamplePointsProp, new GUIContent("Sample Point Count"));
                            
                             if (resamplePointsProp.intValue < 5)
@@ -493,65 +662,8 @@ public class SplineCurveFromTransformsEditor : Editor
                                 new GUIContent("Path Line Width"));
 
                             EditorGUILayout.Space(4);
-                            EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("showDirectionArrows"),
-                                new GUIContent("Display Direction Arrows", "沿路径显示运动方向箭头"));
-                            if (settingProp.FindPropertyRelative("showDirectionArrows").boolValue)
-                            {
-                                EditorGUI.indentLevel++;
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("directionArrowCount"),
-                                    new GUIContent("Arrow Count"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("directionArrowSize"),
-                                    new GUIContent("Arrow Size"));
-                                EditorGUI.indentLevel--;
-                            }
-
-                            EditorGUILayout.Space();
-                            EditorGUILayout.Separator();
-
-                            EditorGUILayout.LabelField("Resample Markers", EditorStyles.boldLabel);
-                            SerializedProperty showResampledCurveProp = settingProp.FindPropertyRelative("showResampledCurve");
-                            EditorGUILayout.PropertyField(showResampledCurveProp,
-                                new GUIContent("Display Resample Points", "在路径上显示弧长均匀的标记球"));
-                            if (showResampledCurveProp.boolValue)
-                            {
-                                EditorGUI.indentLevel++;
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("resampledCurveColor"),
-                                    new GUIContent("Marker Color"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("displayCurveAixe"),
-                                    new GUIContent("Show Axis at Markers"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("visualRotationOffset"),
-                                    new GUIContent("Axis Rotation Bias"));
-                                EditorGUI.indentLevel--;
-                            }
-
-                            EditorGUILayout.Space();
                             EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("displayLable"),
                                 new GUIContent("Display Labels"));
-
-                            // ==================================================== //
-                            // 阶段 4：Easing Preview
-                            // ==================================================== //
-                            EditorGUILayout.Space();
-                            EditorGUILayout.Separator();
-                            EditorGUILayout.LabelField("Easing Preview", EditorStyles.boldLabel);
-
-                            SerializedProperty showEasingProp = settingProp.FindPropertyRelative("showEasingPreview");
-                            EditorGUILayout.PropertyField(showEasingProp,
-                                new GUIContent("Show Easing Preview", "投影 displacementCurve 的等时间隔采样到曲线上。点密=慢，点疏=快。"));
-                            if (showEasingProp.boolValue)
-                            {
-                                EditorGUI.indentLevel++;
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("easingPreviewCount"),
-                                    new GUIContent("Sample Count", "等时间隔采样数。越多越精细。"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("easingPreviewColor"),
-                                    new GUIContent("Sample Color"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("easingPreviewSize"),
-                                    new GUIContent("Sample Size"));
-                                EditorGUILayout.HelpBox(
-                                    "在 Clip Inspector 修改 Display Curve 后,这里会实时反映加速/减速段。",
-                                    MessageType.None);
-                                EditorGUI.indentLevel--;
-                            }
 
                             // ==================================================== //
                             // 阶段 4：Path Events
@@ -571,33 +683,6 @@ public class SplineCurveFromTransformsEditor : Editor
                                 EditorGUILayout.HelpBox(
                                     "事件在 SplineCurveMoveClip 的 Path Events 列表中配置。\n" +
                                     "目标 Transform 上需挂 SplineEventReceiver 组件接收事件。",
-                                    MessageType.None);
-                                EditorGUI.indentLevel--;
-                            }
-
-                            // ==================================================== //
-                            // Phase 4：Stored Spline Preview（运行时实际路径）
-                            // ==================================================== //
-                            EditorGUILayout.Space();
-                            EditorGUILayout.Separator();
-                            EditorGUILayout.LabelField("Stored Spline Preview", EditorStyles.boldLabel);
-
-                            SerializedProperty showStoredProp = settingProp.FindPropertyRelative("showStoredSplinePreview");
-                            EditorGUILayout.PropertyField(showStoredProp,
-                                new GUIContent("Show Stored Preview",
-                                    "绘制【已 bake 进 Clip 的曲线数据】（应用 refFrame 变换后）。\n" +
-                                    "这条曲线代表运行时实际渲染的路径，载具一动它就跟着动——\n" +
-                                    "不依赖控制点 Transforms 的 parenting 状态。"));
-                            if (showStoredProp.boolValue)
-                            {
-                                EditorGUI.indentLevel++;
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("storedPreviewColor"),
-                                    new GUIContent("Preview Color"));
-                                EditorGUILayout.PropertyField(settingProp.FindPropertyRelative("storedPreviewLineWidth"),
-                                    new GUIContent("Line Width"));
-                                EditorGUILayout.HelpBox(
-                                    "仅当 Clip 已绑定 referenceFrame 时显示曲线本体；\n" +
-                                    "绑定后若 bake 数据缺失/失效，会在 GameObject 位置上方画橙色警告标签。",
                                     MessageType.None);
                                 EditorGUI.indentLevel--;
                             }
@@ -650,20 +735,14 @@ public class SplineCurveFromTransformsEditor : Editor
         {
             settingsProp.arraySize++;
             int newIndex = settingsProp.arraySize - 1;
+            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("track").objectReferenceValue = null;
+            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("trackName").stringValue = "";
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("curveColor").colorValue = new Color(
                 Random.value, Random.value, Random.value, 1.0f);
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("debugCurve").boolValue = true;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("resampledCurveColor").colorValue = Color.green;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("resamplePoints").intValue = 30;
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("pathResolution").intValue = 200;
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("pathLineWidth").floatValue = 3f;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("directionArrowCount").intValue = 8;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("directionArrowSize").floatValue = 0.15f;
             // 阶段 4 默认值
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("showEasingPreview").boolValue = false;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("easingPreviewCount").intValue = 30;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("easingPreviewColor").colorValue = Color.cyan;
-            settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("easingPreviewSize").floatValue = 0.06f;
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("showPathEvents").boolValue = true;
             settingsProp.GetArrayElementAtIndex(newIndex).FindPropertyRelative("pathEventSize").floatValue = 0.3f;
             settingsFoldouts[newIndex] = true;

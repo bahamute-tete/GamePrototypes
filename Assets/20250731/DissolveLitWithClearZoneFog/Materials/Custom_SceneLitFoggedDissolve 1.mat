@@ -1,0 +1,106 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Custom_SceneLitFoggedDissolve 1
+  m_Shader: {fileID: 4800000, guid: abcd272d14ed22e4e87df3c581de73c6, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _USE_NORMAL_MAP
+  m_InvalidKeywords:
+  - _DISSOLVE_ENABLED
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: baea36399461fe34ab2b838e027d5eb8, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _DetailBaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DissolveNoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 2800000, guid: 606b5a1629d390541b3ad682f5e4ef69, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: 59f60c0878b882d47aa2cdc4fad01ef9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _BlinnPhongLight: 0
+    - _Cull: 2
+    - _Cutoff: 0.284
+    - _DetailNormalScale: 0.8
+    - _DissolveAAPixels: 3
+    - _DissolveAmount: 0.524
+    - _DissolveAxisCenter: 0
+    - _DissolveBrightnessFade: 0
+    - _DissolveBrightnessPower: 0
+    - _DissolveCoverageWidth: 0
+    - _DissolveDepthA2C: 0
+    - _DissolveDuration: 1
+    - _DissolveEdgeIntensity: 6.49
+    - _DissolveEdgeNoiseStrength: 0
+    - _DissolveEdgeUnits: 0
+    - _DissolveEdgeWidth: 0.025
+    - _DissolveEnable: 1
+    - _DissolveEnabled: 1
+    - _DissolveMode: 0
+    - _DissolveNoiseScale: 3.27
+    - _DissolveRadialReverse: 0
+    - _DissolveSpace: 1
+    - _DissolveSpatialMode: 0
+    - _DissolveStartTime: 0
+    - _DissolveUseNoiseTex: 0
+    - _FogEnable: 0
+    - _FresnelBias: -1
+    - _FresnelIntensity: 0
+    - _FresnelPower: 0.1
+    - _GlobalDissolveAmount: 0
+    - _Metallic: 0.695
+    - _NormalScale: 1
+    - _Smoothness: 0.664
+    - _UseDetailMap: 0
+    - _UseMaps: 0
+    - _UseNormal: 1
+    m_Colors:
+    - _BaseColor: {r: 1, g: 0.25, b: 0.25, a: 1}
+    - _DissolveAxis: {r: 0, g: 0, b: 1, a: 1}
+    - _DissolveEdgeColor: {r: 0.43527526, g: 0.21423101, b: 0, a: 1}
+    - _DissolveRadial: {r: 0, g: 0, b: 0, a: 1}
+    - _EmissionColor: {r: 0, g: 1.3422968, b: 2.297397, a: 1}
+    - _FresnelColor: {r: 0.5, g: 0.7, b: 1, a: 1}
+  m_BuildTextureStacks: []

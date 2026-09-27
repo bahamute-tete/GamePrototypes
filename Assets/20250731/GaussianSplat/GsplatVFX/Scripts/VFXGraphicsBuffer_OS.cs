@@ -67,6 +67,8 @@ public class VFXGraphicsBuffer_OS : MonoBehaviour
     static readonly int ID_NearPlane       = Shader.PropertyToID("_NearPlane");
     static readonly int ID_InvModelScale   = Shader.PropertyToID("_InvModelScale");
 
+    static readonly int ID_IsOrthographic = Shader.PropertyToID("_IsOrthographic");
+
     // VFX Graph 端的属性名（和 VFX Graph 资源 Blackboard 里的命名保持一致）
     const string VFX_PositionBuffer  = "PositionBuffer";
     const string VFX_ColorBuffer     = "ColorBuffer";
@@ -162,13 +164,8 @@ public class VFXGraphicsBuffer_OS : MonoBehaviour
         if (useAudioSpectrum && audioSource != null)
             audioBandBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 8, sizeof(float) * 2);
 
-        // ---- Compute Shader 绑定（一次）----
+        // ---- Kernel lookup; bindings are restored before every dispatch ----
         kernelTransform = computeShader.FindKernel("ComputeSplatTransform");
-        computeShader.SetInt(ID_Count, splatCount);
-        computeShader.SetBuffer(kernelTransform, ID_PositionBuffer, positionBuffer);
-        computeShader.SetBuffer(kernelTransform, ID_ScaleBuffer,    scaleBuffer);
-        computeShader.SetBuffer(kernelTransform, ID_RotationBuffer, rotationBuffer);
-        computeShader.SetBuffer(kernelTransform, ID_OutputBuffer,   outputTransformBuffer);
 
         // ---- VFX Graph 绑定（一次）----
         visualEffect.SetInt(VFX_PointCount, splatCount);
@@ -203,12 +200,21 @@ public class VFXGraphicsBuffer_OS : MonoBehaviour
     // ======================================================================
     void DispatchComputeShader(Camera cam)
     {
+        // ComputeShader assets are shared: restore this instance's buffers and count.
+        computeShader.SetInt(ID_Count, splatCount);
+        computeShader.SetBuffer(kernelTransform, ID_PositionBuffer, positionBuffer);
+        computeShader.SetBuffer(kernelTransform, ID_ScaleBuffer,    scaleBuffer);
+        computeShader.SetBuffer(kernelTransform, ID_RotationBuffer, rotationBuffer);
+        computeShader.SetBuffer(kernelTransform, ID_OutputBuffer,   outputTransformBuffer);
+        computeShader.SetInt(ID_IsOrthographic, cam.orthographic ? 1 : 0);
+
         // 局部坐标管线：buffer 里是 VFX 局部（模型）空间坐标，
         // modelView = 世界→相机 · 局部→世界，一次性把 splat 变到 view 空间
         Transform vfxT = visualEffect.transform;
         computeShader.SetMatrix(ID_ModelViewMatrix, cam.worldToCameraMatrix * vfxT.localToWorldMatrix);
-        computeShader.SetMatrix(ID_ProjMatrix, GL.GetGPUProjectionMatrix(cam.projectionMatrix, false));
-        computeShader.SetVector(ID_ScreenSize, new Vector2(cam.pixelWidth, cam.pixelHeight));
+        // Billboard axes use camera-plane Y-up; VFX handles render-target flips.
+        computeShader.SetMatrix(ID_ProjMatrix, cam.projectionMatrix);
+        computeShader.SetVector(ID_ScreenSize, new Vector2(Mathf.Max(1, cam.pixelWidth), Mathf.Max(1, cam.pixelHeight)));
         computeShader.SetFloat (ID_NearPlane,  cam.nearClipPlane);
 
         // 尺寸补偿：compute 算出的是世界单位半轴，VFX quad size 是局部单位。
