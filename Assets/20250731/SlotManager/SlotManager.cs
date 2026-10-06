@@ -29,6 +29,47 @@ namespace SlotSystem
 
         private readonly Dictionary<string, SlotDefinition> _byId = new Dictionary<string, SlotDefinition>();
         private readonly Dictionary<string, List<SlotAttachment>> _attachments = new Dictionary<string, List<SlotAttachment>>();
+        private static readonly Dictionary<GameObject, SlotAttachment> Owners = new Dictionary<GameObject, SlotAttachment>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOwners()
+        {
+            foreach (var attachment in Owners.Values)
+            {
+                attachment._detached = true;
+                if (attachment.Owner != null) attachment.Owner._attachments.Clear();
+            }
+            Owners.Clear();
+        }
+
+        public static SlotAttachment GetAttachment(GameObject item)
+        {
+            if (ReferenceEquals(item, null) || !Owners.TryGetValue(item, out var attachment)) return null;
+            if (attachment.IsValid) return attachment;
+            if (attachment.Owner != null) attachment.Owner.Forget(attachment);
+            else Owners.Remove(item);
+            return null;
+        }
+
+        private void Forget(SlotAttachment attachment)
+        {
+            attachment._detached = true;
+            if (_attachments.TryGetValue(attachment.SlotId, out var list)) list.Remove(attachment);
+            if (!ReferenceEquals(attachment.Attached, null) && Owners.TryGetValue(attachment.Attached, out var current) && current == attachment)
+                Owners.Remove(attachment.Attached);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (var list in _attachments.Values)
+                foreach (var attachment in list)
+                {
+                    attachment._detached = true;
+                    if (!ReferenceEquals(attachment.Attached, null) && Owners.TryGetValue(attachment.Attached, out var current) && current == attachment)
+                        Owners.Remove(attachment.Attached);
+                }
+            _attachments.Clear();
+        }
 
         // ---------- 生命周期 ----------
 
@@ -42,16 +83,26 @@ namespace SlotSystem
             EnsureReferences();
             // 运行态自动重建;编辑态用右键菜单 Rebuild Anchors 手动触发,避免编辑器回调时机问题
             if (Application.isPlaying) RebuildAnchors();
-            else BuildLookup();
+            else { BuildLookup(); RecoverAnchors(); }
         }
 
         private void OnValidate()
         {
+            if (slots == null) slots = new List<SlotDefinition>();
             // 兜底:Inspector 新增列表元素时字段初值不生效,localScale 会是 (0,0,0)。
             // 这里把全零缩放纠正回 (1,1,1),让 Inspector 直接显示正确值。
             foreach (var def in slots)
                 if (def != null && def.localScale == Vector3.zero)
                     def.localScale = Vector3.one;
+            BuildLookup();
+        }
+
+        // Reconnect serialized anchors after domain reload without changing the hierarchy.
+        private void RecoverAnchors()
+        {
+            foreach (var anchor in GetComponentsInChildren<SlotAnchor>(true))
+                if (anchor.Owner == this && _byId.TryGetValue(anchor.SlotId, out var definition))
+                    definition.anchor = anchor.transform;
         }
 
         // ---------- 引用自动绑定 ----------
@@ -92,8 +143,7 @@ namespace SlotSystem
             else
             {
                 var root = skeletonRoot != null ? skeletonRoot : transform;
-                if (!string.IsNullOrEmpty(def.bonePath))
-                    t = root.Find(def.bonePath);
+                t = string.IsNullOrEmpty(def.bonePath) ? root : root.Find(def.bonePath);
             }
 
             def.boneTransform = t; // 回写缓存
@@ -107,7 +157,10 @@ namespace SlotSystem
         [ContextMenu("Rebind Bones (clear cached refs)")]
         public void RebindBones()
         {
-            foreach (var def in slots) def.boneTransform = null;
+#if UNITY_EDITOR
+            if (!Application.isPlaying) UnityEditor.Undo.RecordObject(this, "Rebind Slot Bones");
+#endif
+            foreach (var def in slots) if (def != null) def.boneTransform = null;
             RebuildAnchors();
         }
 
@@ -116,6 +169,9 @@ namespace SlotSystem
         [ContextMenu("Rebuild Anchors")]
         public void RebuildAnchors()
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) UnityEditor.Undo.RegisterFullObjectHierarchyUndo(gameObject, "Rebuild Slot Anchors");
+#endif
             EnsureReferences();
             BuildLookup();
 
@@ -131,6 +187,7 @@ namespace SlotSystem
                 var bone = ResolveBone(def);
                 if (bone == null)
                 {
+                    def.anchor = null;
                     Debug.LogWarning($"[SlotManager] slot '{def.slotId}' 无法解析骨骼,跳过", this);
                     continue;
                 }
@@ -140,6 +197,9 @@ namespace SlotSystem
                 if (anchor == null)
                 {
                     var go = new GameObject($"[Slot] {def.slotId}");
+#if UNITY_EDITOR
+                    if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(go, "Create Slot Anchor");
+#endif
                     anchor = go.AddComponent<SlotAnchor>();
                     anchor.Initialize(this, def.slotId);
                 }
@@ -173,7 +233,7 @@ namespace SlotSystem
             _byId.Clear();
             foreach (var def in slots)
             {
-                if (string.IsNullOrEmpty(def.slotId)) continue;
+                if (def == null || string.IsNullOrEmpty(def.slotId)) continue;
                 if (_byId.ContainsKey(def.slotId))
                 {
                     Debug.LogWarning($"[SlotManager] 重复 slotId '{def.slotId}',忽略后者", this);
@@ -185,14 +245,15 @@ namespace SlotSystem
 
         // ---------- 查询 ----------
 
-        public bool HasSlot(string slotId) => _byId.ContainsKey(slotId);
+        public bool HasSlot(string slotId) => !string.IsNullOrEmpty(slotId) && _byId.ContainsKey(slotId);
 
         public SlotDefinition GetDefinition(string slotId)
-            => _byId.TryGetValue(slotId, out var d) ? d : null;
+            => !string.IsNullOrEmpty(slotId) && _byId.TryGetValue(slotId, out var d) ? d : null;
 
         public Transform GetAnchor(string slotId)
         {
             var d = GetDefinition(slotId);
+            if (d != null && d.anchor == null) RecoverAnchors();
             return d != null ? d.anchor : null;
         }
 
@@ -247,7 +308,7 @@ namespace SlotSystem
         // ---------- 挂载 ----------
 
         public SlotAttachment Attach(string slotId, GameObject go,
-            AttachMode mode = AttachMode.Snap, bool destroyOnDetach = false)
+            AttachMode mode = AttachMode.Snap, bool destroyOnDetach = false, bool replaceExisting = true)
         {
             if (go == null) return null;
 
@@ -259,6 +320,14 @@ namespace SlotSystem
             }
 
             var def = GetDefinition(slotId);
+            if (go.transform == anchor || anchor.IsChildOf(go.transform)) return null;
+            var previous = GetAttachment(go);
+            if (previous != null && previous.Owner == this && previous.SlotId == slotId) return previous;
+            if (!replaceExisting && def.occupancy == SlotOccupancy.Single &&
+                _attachments.TryGetValue(slotId, out var occupied) && occupied.Exists(a => a.IsValid && a.Attached != go))
+                return null;
+            // Transfer invalidates the old handle without running its destroy-on-detach policy.
+            if (previous != null) previous.Owner.Forget(previous);
             if (def.occupancy == SlotOccupancy.Single) DetachAll(slotId);
 
             if (mode == AttachMode.Snap)
@@ -275,6 +344,7 @@ namespace SlotSystem
 
             var att = new SlotAttachment
             {
+                Owner = this,
                 SlotId = slotId,
                 Attached = go,
                 Anchor = anchor,
@@ -287,22 +357,45 @@ namespace SlotSystem
                 _attachments[slotId] = list;
             }
             list.Add(att);
+            Owners[go] = att;
             return att;
         }
 
         public void Detach(SlotAttachment att)
         {
-            if (att == null || att._detached) return;
-            att._detached = true;
-
-            if (_attachments.TryGetValue(att.SlotId, out var list))
-                list.Remove(att);
+            if (att == null || att._detached || att.Owner != this) return;
+            bool ownsItem = att.IsValid && GetAttachment(att.Attached) == att;
+            Forget(att);
+            if (!ownsItem) return;
 
             if (att.Attached != null)
             {
                 if (att.DestroyOnDetach) SafeDestroy(att.Attached);
                 else att.Attached.transform.SetParent(null, true);
             }
+        }
+
+        /// <summary>Release ownership without invoking destroy-on-detach (transfers and previews).</summary>
+        public void Release(SlotAttachment attachment)
+        {
+            if (attachment == null || attachment.Owner != this || attachment._detached) return;
+            bool current = attachment.IsValid && GetAttachment(attachment.Attached) == attachment;
+            Forget(attachment);
+            if (current) attachment.Attached.transform.SetParent(null, true);
+        }
+
+        // Restore the exact original handle after preview, so gameplay references remain valid.
+        internal void RestoreAttachment(SlotAttachment attachment)
+        {
+            if (attachment == null || attachment.Owner != this || attachment.Attached == null ||
+                attachment.Anchor == null || attachment.Attached.transform.parent != attachment.Anchor) return;
+            var current = GetAttachment(attachment.Attached);
+            if (current != null && current != attachment) return;
+            if (!_attachments.TryGetValue(attachment.SlotId, out var list))
+                _attachments.Add(attachment.SlotId, list = new List<SlotAttachment>());
+            if (!list.Contains(attachment)) list.Add(attachment);
+            attachment._detached = false;
+            Owners[attachment.Attached] = attachment;
         }
 
         public void DetachAll(string slotId)
@@ -319,7 +412,14 @@ namespace SlotSystem
         {
             if (o == null) return;
             if (Application.isPlaying) Destroy(o);
-            else DestroyImmediate(o);
+            else
+            {
+#if UNITY_EDITOR
+                UnityEditor.Undo.DestroyObjectImmediate(o);
+#else
+                DestroyImmediate(o);
+#endif
+            }
         }
     }
 }

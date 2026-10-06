@@ -8,13 +8,15 @@ namespace SlotSystem
     /// </summary>
     public class SlotAttachment
     {
+        public SlotManager Owner { get; internal set; }
         public string SlotId { get; internal set; }
         public GameObject Attached { get; internal set; }
         public Transform Anchor { get; internal set; }
         public bool DestroyOnDetach { get; internal set; }
 
         /// <summary>挂载物是否仍然有效(未被销毁、未被解绑)。</summary>
-        public bool IsValid => Attached != null && !_detached;
+        public bool IsValid => Owner != null && Attached != null && !_detached &&
+            Attached.transform.parent == Anchor;
 
         internal bool _detached;
     }

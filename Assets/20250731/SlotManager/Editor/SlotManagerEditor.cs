@@ -240,6 +240,7 @@ namespace SlotSystem.EditorTools
                 // 若锚点已存在,直接更新做实时预览(无需整体重建)
                 if (def.anchor != null)
                 {
+                    Undo.RecordObject(def.anchor, "Edit Slot Anchor Offset");
                     def.anchor.localPosition = def.localPosition;
                     def.anchor.localRotation = Quaternion.Euler(def.localEulerAngles);
                 }
@@ -257,7 +258,7 @@ namespace SlotSystem.EditorTools
         private static string ComputeBonePath(Transform root, Transform bone)
         {
             if (root == null || bone == null) return "";
-            if (bone == root) return ""; // 绑根骨骼时只能靠直接引用,路径回退无法表达
+            if (bone == root) return ""; // 空路径代表 skeletonRoot 本身。
             var parts = new List<string>();
             var cur = bone;
             while (cur != null && cur != root) { parts.Add(cur.name); cur = cur.parent; }

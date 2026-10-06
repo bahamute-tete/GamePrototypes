@@ -1,0 +1,6 @@
+PASS: Separation pushes a close pair apart
+PASS: Coincident pair receives opposite finite velocities
+PASS: Cohesion steers toward neighbours
+PASS: Alignment transfers neighbour heading
+PASS: 65 agents (partial thread group), 600 GPU steps: finite positions, ground plane, arena bounds, speed limit.
+Graph imported and prefab generated separately. This report does not measure rendering performance or guarantee collision-free motion.

@@ -1,0 +1,88 @@
+#pragma kernel Simulate
+
+// Two float4s per agent: position.xyz / heading, velocity.xyz / unused.
+StructuredBuffer<float4> _Read;
+RWStructuredBuffer<float4> _Write;
+uint _Count;
+float _DeltaTime, _NeighbourRadius, _SeparationRadius;
+float _Alignment, _Cohesion, _Separation, _MaxSpeed, _MaxAcceleration;
+float3 _Center;
+float _BoundsRadius, _BoundaryWeight;
+
+float3 SafeDirection(float3 v)
+{
+    return v * rsqrt(max(dot(v, v), 1e-10));
+}
+
+float3 Limit(float3 v, float maximum)
+{
+    return v * min(1.0, maximum * rsqrt(max(dot(v, v), 1e-10)));
+}
+
+[numthreads(64, 1, 1)]
+void Simulate(uint3 thread : SV_DispatchThreadID)
+{
+    uint i = thread.x;
+    if (i >= _Count) return;
+    float4 state = _Read[2 * i];
+    float3 p = state.xyz;
+    float3 v = _Read[2 * i + 1].xyz;
+    float3 separation = 0, velocitySum = 0, positionSum = 0;
+    uint neighbours = 0;
+
+    // Reference version: all-pairs, O(N^2). Replace this loop with a grid
+    // query for large crowds; rendering and buffer layout need not change.
+    for (uint j = 0; j < _Count; j++)
+    {
+        if (i == j) continue;
+        float3 other = _Read[2 * j].xyz;
+        float3 offset = p - other;
+        offset.y = 0;
+        float d2 = dot(offset, offset);
+        if (d2 < _NeighbourRadius * _NeighbourRadius)
+        {
+            neighbours++;
+            positionSum += other;
+            velocitySum += _Read[2 * j + 1].xyz;
+        }
+        if (d2 < _SeparationRadius * _SeparationRadius)
+        {
+            // Opposite deterministic directions also separate coincident pairs.
+            if (d2 < 1e-8)
+            {
+                float a = (min(i,j) * 13u + max(i,j) * 97u) * 0.618034;
+                separation += float3(cos(a), 0, sin(a)) * (i < j ? 1 : -1);
+            }
+            else
+                separation += offset * rsqrt(d2) * (1 - sqrt(d2) / _SeparationRadius);
+        }
+    }
+
+    float3 acceleration = separation * _Separation;
+    if (neighbours > 0)
+    {
+        acceleration += (velocitySum / neighbours - v) * _Alignment;
+        acceleration += SafeDirection(positionSum / neighbours - p) * _Cohesion;
+    }
+    float3 towardCenter = _Center - p;
+    towardCenter.y = 0;
+    float edge = saturate((length(towardCenter) - _BoundsRadius * 0.8) / max(_BoundsRadius * 0.2, 0.01));
+    acceleration += SafeDirection(towardCenter) * edge * _BoundaryWeight;
+    acceleration.y = 0;
+    v = Limit(v + Limit(acceleration, _MaxAcceleration) * _DeltaTime, _MaxSpeed);
+    v.y = 0;
+    p += v * _DeltaTime;
+    p.y = _Center.y;
+    // Circular arena containment, not a general-purpose obstacle solver.
+    float3 radial = p - _Center;
+    float radius = length(radial);
+    if (radius > _BoundsRadius)
+    {
+        float3 n = radial / radius;
+        p = _Center + n * _BoundsRadius;
+        v -= n * max(0, dot(v, n));
+    }
+    float yaw = dot(v, v) > 1e-6 ? atan2(v.x, v.z) : state.w;
+    _Write[2 * i] = float4(p, yaw);
+    _Write[2 * i + 1] = float4(v, 0);
+}
